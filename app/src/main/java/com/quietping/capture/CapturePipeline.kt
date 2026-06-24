@@ -1,5 +1,6 @@
 package com.quietping.capture
 
+import android.service.notification.NotificationListenerService
 import android.util.Log
 import com.quietping.domain.alerts.AlertDispatcher
 import com.quietping.domain.model.AppPackage
@@ -9,6 +10,8 @@ import com.quietping.domain.parser.MessageParser
 import com.quietping.domain.repo.MessageRepository
 import com.quietping.domain.repo.RuleRepository
 import com.quietping.domain.rules.RuleEngine
+import com.quietping.domain.vault.DeletionDiffer
+import com.quietping.domain.vault.SeenMessage
 import com.quietping.domain.vault.VaultManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -59,6 +62,22 @@ class CapturePipeline @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
+    /** Array-diff engine for precise per-message deletion detection. */
+    private val deletionDiffer = DeletionDiffer()
+
+    /**
+     * Last MessagingStyle snapshot seen per notification key, for [deletionDiffer].
+     * Access-ordered LRU bounded to [MAX_TRACKED_CONVERSATIONS] so a long-lived
+     * listener never grows this without bound. Touched only on the single pipeline
+     * consumer coroutine, so it needs no external synchronization.
+     */
+    private val lastSnapshots = object : LinkedHashMap<String, List<SeenMessage>>(
+        16, 0.75f, /* accessOrder = */ true,
+    ) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, List<SeenMessage>>): Boolean =
+            size > MAX_TRACKED_CONVERSATIONS
+    }
+
     init {
         scope.launch {
             for (event in events) {
@@ -101,6 +120,38 @@ class CapturePipeline @Inject constructor(
         for (message in messages) {
             ingestAndMatch(message)
         }
+        detectArrayDeletions(event)
+    }
+
+    /**
+     * Precise deletion detection (PRD §6 / research: array diffing). When a chat's
+     * notification is re-posted, compare its MessagingStyle array against the prior
+     * snapshot: any message that vanished while an *older* one survived was deleted,
+     * not scrolled off. We flag exactly that message by body, then store the new
+     * snapshot. No-op for non-MessagingStyle notifications (no array to diff).
+     */
+    private suspend fun detectArrayDeletions(event: RawEvent.NotificationPosted) {
+        if (event.messages.isEmpty()) return
+        val app = AppPackage.fromPackageId(event.packageName) ?: return
+
+        val current = event.messages.mapIndexed { i, (sender, body) ->
+            // Prefer the entry's own MessagingStyle timestamp; when absent (0L/empty)
+            // fall back to the notification time so the differ safely no-ops rather
+            // than inventing an ordering.
+            val t = event.messageTimes.getOrNull(i)?.takeIf { it > 0L } ?: event.postedAt
+            SeenMessage(sender = sender, body = body, postedAt = t)
+        }
+        val previous = lastSnapshots[event.key]
+        if (previous != null) {
+            for (gone in deletionDiffer.deletions(previous, current)) {
+                vaultManager.markDeleted(
+                    conversationKey = event.key,
+                    appPackage = app,
+                    body = gone.body,
+                )
+            }
+        }
+        lastSnapshots[event.key] = current
     }
 
     /**
@@ -131,13 +182,20 @@ class CapturePipeline @Inject constructor(
     }
 
     /**
-     * Removal of a chat-app notification is a deletion *heuristic* only. We forward
-     * the conversation context to the [VaultManager], which decides (together with
-     * revoked-message sentinels handled in the parser) whether to surface it as a
-     * recovered/deleted message. The notification [RawEvent.NotificationRemoved.key]
-     * doubles as the conversation key for chat apps where no finer id is available.
+     * Removal of a chat-app notification is a *weak* deletion heuristic, and only
+     * when the framework says the removal was **app-driven**. User-driven dismissals
+     * (swipe, tap, "clear all", or our own listener cancel) must never be read as a
+     * message deletion — that was the dominant false-positive source. We drop those
+     * via the [RawEvent.NotificationRemoved.reason] code; the precise per-message
+     * detection lives in [detectArrayDeletions] and the parser's revoked-message
+     * sentinel. A [RawEvent.REASON_UNKNOWN] reason (legacy/synthetic) is left to flow
+     * through so behavior is unchanged where no reason is supplied.
+     *
+     * The [RawEvent.NotificationRemoved.key] doubles as the conversation key for chat
+     * apps where no finer id is available.
      */
     private suspend fun handleNotificationRemoved(event: RawEvent.NotificationRemoved) {
+        if (event.reason in USER_DISMISS_REASONS) return
         val app = AppPackage.fromPackageId(event.packageName) ?: return
         vaultManager.markDeleted(
             conversationKey = event.key,
@@ -205,5 +263,22 @@ class CapturePipeline @Inject constructor(
 
     private companion object {
         const val TAG = "CapturePipeline"
+
+        /** Cap on conversations tracked for array-diff deletion detection. */
+        const val MAX_TRACKED_CONVERSATIONS = 256
+
+        /**
+         * Removal reasons that are user-initiated (or our own cancel) and therefore
+         * NOT evidence of a message deletion. App-driven reasons (REASON_APP_CANCEL /
+         * REASON_APP_CANCEL_ALL) and REASON_UNKNOWN are intentionally excluded so they
+         * still flow through the (weak) removal heuristic.
+         */
+        val USER_DISMISS_REASONS: Set<Int> = setOf(
+            NotificationListenerService.REASON_CLICK,
+            NotificationListenerService.REASON_CANCEL,
+            NotificationListenerService.REASON_CANCEL_ALL,
+            NotificationListenerService.REASON_LISTENER_CANCEL,
+            NotificationListenerService.REASON_LISTENER_CANCEL_ALL,
+        )
     }
 }

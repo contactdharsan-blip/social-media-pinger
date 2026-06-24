@@ -22,6 +22,19 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!--
+      Read chat-app media so the MediaObserver can copy images/video/voice notes into
+      the private MediaVault BEFORE a "delete for everyone" removes the original
+      (PRD §6 / on-device only — there is still no INTERNET permission, so nothing
+      captured can leave the device). Granular READ_MEDIA_* on Android 13+; the
+      legacy READ_EXTERNAL_STORAGE is capped to API 32 and below.
+    -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
     <application
         android:name=".QuietPingApp"
         android:allowBackup="false"

@@ -22,17 +22,37 @@ sealed interface RawEvent {
         val bigText: String?,
         val subText: String?,
         val messages: List<Pair<String, String>>,
-        val postedAt: Long
+        val postedAt: Long,
+        /**
+         * Per-entry timestamps parallel to [messages], from each MessagingStyle
+         * bundle's `time` field. Used only by the deletion array-differ to give each
+         * message a *stable* identity across re-posts (the notification's own
+         * [postedAt] is shared by every entry and cannot distinguish them). Empty
+         * when the source isn't MessagingStyle or omitted the field — the differ
+         * then safely no-ops rather than guessing.
+         */
+        val messageTimes: List<Long> = emptyList()
     ) : RawEvent
 
     /**
      * A previously posted notification ([key]) from [packageName] was removed.
-     * Used as a deletion heuristic for chat apps.
+     * Used as a (weak) deletion heuristic for chat apps.
+     *
+     * [reason] is the framework removal reason (a `NotificationListenerService.REASON_*`
+     * constant). It lets the pipeline ignore user-driven dismissals (swipe / tap /
+     * "clear all"), which must never be mistaken for a message deletion. [REASON_UNKNOWN]
+     * (0) is used when the platform did not supply one (pre-26 path / synthetic events).
      */
     data class NotificationRemoved(
         val packageName: String,
-        val key: String
+        val key: String,
+        val reason: Int = REASON_UNKNOWN
     ) : RawEvent
+
+    companion object {
+        /** Sentinel for "no removal reason supplied". */
+        const val REASON_UNKNOWN: Int = 0
+    }
 
     /**
      * The SMS/MMS provider signalled a change at [uri]. Triggers a diff of the

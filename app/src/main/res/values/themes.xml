@@ -6,15 +6,13 @@
       background to avoid a white flash before Compose draws, transparent system
       bars for edge-to-edge, and the emerald accent for any platform chrome.
     -->
-    <style name="Theme.QuietPing" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.QuietPing" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/qp_canvas</item>
         <item name="android:colorBackground">@color/qp_canvas</item>
 
-        <!-- Material3 accent hooks -->
-        <item name="colorPrimary">@color/md_theme_dark_primary</item>
-        <item name="colorOnPrimary">@color/md_theme_dark_onPrimary</item>
-        <item name="colorSecondary">@color/md_theme_dark_secondary</item>
-        <item name="colorOnSecondary">@color/md_theme_dark_onSecondary</item>
+        <!-- Accent for platform chrome (framework attrs only; the real color
+             scheme is driven by Compose Material3 in com.quietping.ui.theme) -->
+        <item name="android:colorPrimary">@color/md_theme_dark_primary</item>
         <item name="android:colorAccent">@color/qp_emerald_400</item>
 
         <!-- Edge-to-edge: transparent status + navigation bars -->

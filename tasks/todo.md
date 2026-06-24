@@ -24,3 +24,12 @@
 - Review BUILD_STATUS.md; fix any residual compile errors
 - Resolve PRD §14 open questions (SMS strategy, retention default, icon variants)
 - Replace placeholder silent WAVs with designed alert tones
+
+## NEW: capture-technique hardening (2026-06-24, from deleted-message research)
+Gap analysis vs research — already had: notif listener, a11y, SMS diff, edit/version, revoke sentinel.
+Adding the 4 genuinely-missing techniques:
+- [x] 1. Active-notification snapshot — `onListenerConnected` ingests `activeNotifications`; filtered to supported packages; VaultManager dedupes re-ingests.
+- [x] 2. Removal reason codes — 3-arg `onNotificationRemoved`; `RawEvent.NotificationRemoved.reason`; pipeline drops `USER_DISMISS_REASONS` (click/cancel/cancel-all/listener-cancel).
+- [x] 3. Deletion-diff hardening — `DeletionDiffer` + `SeenMessage`; per-message MessagingStyle `time` threaded via `messageTimes`; LRU snapshot map in pipeline; 7 unit tests.
+- [x] 4. Media capture — `MediaObserver` (3 MediaStore collections, path-marker filter, baseline-primed) + `MediaVault` (private filesDir copy, dedupe by id). READ_MEDIA_* / READ_EXTERNAL_STORAGE(maxSdk 32) in manifest.
+- [x] Verify: `compileDebugKotlin`+KSP/Hilt BUILD SUCCESSFUL; full unit suite 66 tests, 0 fail (incl. 7 new). UI surfacing of captured media = follow-up.

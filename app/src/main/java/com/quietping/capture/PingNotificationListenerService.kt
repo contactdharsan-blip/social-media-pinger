@@ -4,8 +4,10 @@ import android.app.Notification
 import android.content.Context
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.RawEvent
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -49,21 +51,26 @@ class PingNotificationListenerService : NotificationListenerService() {
     private val pipeline: CapturePipeline by lazy { applicationContext.capturePipeline() }
 
     private var smsObserver: SmsObserver? = null
+    private var mediaObserver: MediaObserver? = null
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.d(TAG, "Notification listener connected")
+        snapshotActiveNotifications()
         registerSmsObserver()
+        registerMediaObserver()
     }
 
     override fun onListenerDisconnected() {
         Log.d(TAG, "Notification listener disconnected")
         unregisterSmsObserver()
+        unregisterMediaObserver()
         super.onListenerDisconnected()
     }
 
     override fun onDestroy() {
         unregisterSmsObserver()
+        unregisterMediaObserver()
         super.onDestroy()
     }
 
@@ -73,14 +80,47 @@ class PingNotificationListenerService : NotificationListenerService() {
         pipeline.offer(event)
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+    /**
+     * 3-arg removal callback (API 26+, our minSdk). [reason] is forwarded so the
+     * pipeline can ignore user-driven dismissals (swipe / tap / "clear all") and
+     * only treat app-driven removals as a possible deletion signal.
+     */
+    override fun onNotificationRemoved(
+        sbn: StatusBarNotification?,
+        rankingMap: RankingMap?,
+        reason: Int,
+    ) {
         val notification = sbn ?: return
         pipeline.offer(
             RawEvent.NotificationRemoved(
                 packageName = notification.packageName,
                 key = notification.key ?: keyFallback(notification),
+                reason = reason,
             ),
         )
+    }
+
+    /**
+     * On (re)connect — notably after a reboot — the chat apps' notifications are
+     * already on the shade and will never re-fire [onNotificationPosted]. Replay
+     * the currently-active set through the same path so those messages are still
+     * captured. Re-ingesting an already-stored message is harmless: the VaultManager
+     * dedupes by content key.
+     */
+    private fun snapshotActiveNotifications() {
+        val active: Array<out StatusBarNotification> = try {
+            activeNotifications ?: return
+        } catch (e: SecurityException) {
+            Log.d(TAG, "activeNotifications unavailable (not yet bound)")
+            return
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read active notifications", e)
+            return
+        }
+        for (sbn in active) {
+            if (AppPackage.fromPackageId(sbn.packageName) == null) continue
+            pipeline.offer(buildPostedEvent(sbn))
+        }
     }
 
     private fun registerSmsObserver() {
@@ -93,8 +133,20 @@ class PingNotificationListenerService : NotificationListenerService() {
         smsObserver = null
     }
 
+    private fun registerMediaObserver() {
+        if (mediaObserver != null) return
+        mediaObserver = MediaObserver.register(applicationContext)
+    }
+
+    private fun unregisterMediaObserver() {
+        mediaObserver?.unregister(applicationContext)
+        mediaObserver = null
+    }
+
     private fun buildPostedEvent(sbn: StatusBarNotification): RawEvent.NotificationPosted {
         val extras: Bundle = sbn.notification?.extras ?: Bundle.EMPTY
+        val postedAt = if (sbn.postTime > 0L) sbn.postTime else System.currentTimeMillis()
+        val style = extractMessagingStyle(extras)
         return RawEvent.NotificationPosted(
             packageName = sbn.packageName,
             key = sbn.key ?: keyFallback(sbn),
@@ -102,21 +154,23 @@ class PingNotificationListenerService : NotificationListenerService() {
             text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
             bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
-            messages = extractMessagingStyle(extras),
-            postedAt = if (sbn.postTime > 0L) sbn.postTime else System.currentTimeMillis(),
+            messages = style.map { it.first to it.second },
+            postedAt = postedAt,
+            messageTimes = style.map { it.third },
         )
     }
 
     /**
      * Flatten a MessagingStyle notification's message list into ordered
-     * (sender, body) pairs. Falls back to an empty list when the notification is not
+     * (sender, body, time) triples. `time` is each entry's own timestamp (0L when
+     * the bundle omits it). Falls back to an empty list when the notification is not
      * MessagingStyle (parsers then use the title/text/bigText extras).
      */
-    private fun extractMessagingStyle(extras: Bundle): List<Pair<String, String>> {
+    private fun extractMessagingStyle(extras: Bundle): List<Triple<String, String, Long>> {
         val raw = extras.getParcelableArrayCompat(Notification.EXTRA_MESSAGES)
             ?: return emptyList()
 
-        val out = ArrayList<Pair<String, String>>(raw.size)
+        val out = ArrayList<Triple<String, String, Long>>(raw.size)
         for (item in raw) {
             val bundle = item as? Bundle ?: continue
             val body = bundle.getCharSequence(KEY_MESSAGING_TEXT)?.toString().orEmpty()
@@ -124,7 +178,8 @@ class PingNotificationListenerService : NotificationListenerService() {
             val sender = bundle.getCharSequence(KEY_MESSAGING_SENDER)?.toString()
                 ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                 ?: ""
-            out += sender to body
+            val time = bundle.getLong(KEY_MESSAGING_TIME, 0L)
+            out += Triple(sender, body, time)
         }
         return out
     }
@@ -138,6 +193,7 @@ class PingNotificationListenerService : NotificationListenerService() {
         // Keys inside each EXTRA_MESSAGES bundle (NotificationCompat.MessagingStyle).
         const val KEY_MESSAGING_TEXT = "text"
         const val KEY_MESSAGING_SENDER = "sender"
+        const val KEY_MESSAGING_TIME = "time"
     }
 }
 
