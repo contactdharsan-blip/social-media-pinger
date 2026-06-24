@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Stealth" launcher alias icon (PRD 6E disguise + privacy feature): looks like a
+  generic system utility (a neutral gear on a dark slate tile), NOT QuietPing.
+  No emerald, no droplet, nothing that hints at message capture. Self-contained.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Neutral dark slate tile -->
+    <path
+        android:fillColor="#1F2937"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Generic gear glyph in muted gray (utility look) -->
+    <path
+        android:fillColor="#FF9CA3AF"
+        android:pathData="M54,40.5
+            L57.2,40.5
+            L58.4,46.1
+            C60.0,46.6 61.5,47.3 62.8,48.3
+            L68.0,45.9
+            L71.6,49.5
+            L69.2,54.7
+            C70.2,56.0 70.9,57.5 71.4,59.1
+            L77.0,60.3
+            L77.0,63.5
+            L71.4,64.7
+            C70.9,66.3 70.2,67.8 69.2,69.1
+            L71.6,74.3
+            L68.0,77.9
+            L62.8,75.5
+            C61.5,76.5 60.0,77.2 58.4,77.7
+            L57.2,83.3
+            L54,83.3
+            L50.8,83.3
+            L49.6,77.7
+            C48.0,77.2 46.5,76.5 45.2,75.5
+            L40.0,77.9
+            L36.4,74.3
+            L38.8,69.1
+            C37.8,67.8 37.1,66.3 36.6,64.7
+            L31.0,63.5
+            L31.0,60.3
+            L36.6,59.1
+            C37.1,57.5 37.8,56.0 38.8,54.7
+            L36.4,49.5
+            L40.0,45.9
+            L45.2,48.3
+            C46.5,47.3 48.0,46.6 49.6,46.1
+            L50.8,40.5
+            Z" />
+
+    <!-- Gear hub (knockout) -->
+    <path
+        android:fillColor="#1F2937"
+        android:pathData="M54,62
+            m-8,0
+            a8,8 0 1,0 16,0
+            a8,8 0 1,0 -16,0 Z" />
+</vector>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Opt-in Accessibility booster (PRD 4 / 6A / 13 V3). Deliberately scoped to ONLY
+  the target messaging packages and a minimal set of event types so it stays
+  battery-light and privacy-respecting. canRetrieveWindowContent is required to
+  read silenced/never-notified message text the notification stream misses.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeNotificationStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="100"
+    android:packageNames="com.whatsapp,com.instagram.android,com.facebook.orca,com.facebook.katana,com.google.android.apps.messaging,com.android.messaging" />

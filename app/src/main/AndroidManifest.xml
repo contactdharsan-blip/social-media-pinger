@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      QuietPing is fully on-device. There is DELIBERATELY no INTERNET permission:
+      the OS itself then guarantees zero exfiltration of captured message content
+      (PRD §11). Do not add networking.
+    -->
+
+    <!-- Read the local SMS/MMS store for full-history + deletion diffing (PRD 6A). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- Post the re-notification heads-up alerts (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Allow VIP / name conditions to bypass Do Not Disturb (PRD §8). -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Rebind the notification listener after reboot (PRD 6F). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Optional biometric app lock for the Vault (PRD §11). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Foreground service for the SMS ContentObserver / listener keep-alive. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application
+        android:name=".QuietPingApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.QuietPing"
+        tools:targetApi="34">
+
+        <!--
+          Single host Activity for the whole Compose app. It is exported so the
+          launcher aliases (which carry the LAUNCHER intent-filters) can target
+          it, but it has NO launcher intent-filter of its own.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.QuietPing" />
+
+        <!-- App-icon switcher (PRD 6E): one alias per selectable icon. Exactly
+             one is enabled at a time via PackageManager.setComponentEnabledSetting.
+             Default ships enabled; the others ship disabled. -->
+        <activity-alias
+            android:name=".alias.Default"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name_default"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Mono"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_mono"
+            android:label="@string/app_name_mono"
+            android:roundIcon="@drawable/ic_launcher_mono"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Disguised icon (privacy feature): reads as a generic utility. -->
+        <activity-alias
+            android:name=".alias.Stealth"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_stealth"
+            android:label="@string/app_name_stealth"
+            android:roundIcon="@drawable/ic_launcher_stealth"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Primary capture source: reads StatusBarNotification extras for all
+             chat apps (PRD §4). Bound by the system. -->
+        <service
+            android:name=".capture.PingNotificationListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Opt-in Accessibility booster (PRD 4 / 13 V3): scoped to the target
+             packages via @xml/accessibility_service_config. -->
+        <service
+            android:name=".capture.PingAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Rebind capture after reboot (PRD 6F). -->
+        <receiver
+            android:name=".capture.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

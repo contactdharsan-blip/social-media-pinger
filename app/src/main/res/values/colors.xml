@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dark Liquid-Glass palette (see DESIGN.md). The Compose UI drives its full
+  color scheme from com.quietping.ui.theme; these resources cover the values the
+  Android platform itself needs (window background, status/nav bars, splash,
+  notification accent) and the adaptive-icon background layer.
+-->
+<resources>
+    <!-- Canvas: near-black #030712 -->
+    <color name="qp_canvas">#FF030712</color>
+    <color name="qp_bg_secondary">#FF111827</color>
+    <color name="qp_bg_tertiary">#FF1F2937</color>
+
+    <!-- Accent ramp: emerald -> teal -->
+    <color name="qp_emerald_400">#FF34D399</color>
+    <color name="qp_emerald_500">#FF10B981</color>
+    <color name="qp_emerald_600">#FF059669</color>
+    <color name="qp_teal_500">#FF14B8A6</color>
+    <color name="qp_teal_600">#FF0D9488</color>
+
+    <!-- Text -->
+    <color name="qp_text_primary">#FFF8FAFC</color>
+    <color name="qp_text_secondary">#FFCBD5E1</color>
+    <color name="qp_text_tertiary">#FF94A3B8</color>
+
+    <!-- Material3 dark theme hooks (platform-facing) -->
+    <color name="md_theme_dark_primary">#FF34D399</color>
+    <color name="md_theme_dark_onPrimary">#FF00382A</color>
+    <color name="md_theme_dark_secondary">#FF14B8A6</color>
+    <color name="md_theme_dark_onSecondary">#FF003733</color>
+    <color name="md_theme_dark_background">#FF030712</color>
+    <color name="md_theme_dark_onBackground">#FFF8FAFC</color>
+    <color name="md_theme_dark_surface">#FF030712</color>
+    <color name="md_theme_dark_onSurface">#FFF8FAFC</color>
+
+    <!-- Transparent for edge-to-edge system bars -->
+    <color name="qp_transparent">#00000000</color>
+</resources>

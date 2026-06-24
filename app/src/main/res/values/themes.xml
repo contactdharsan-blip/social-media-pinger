@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Platform theme. The real UI is Compose + Material3 (com.quietping.ui.theme),
+      so this XML theme only governs the window the Activity lives in: near-black
+      background to avoid a white flash before Compose draws, transparent system
+      bars for edge-to-edge, and the emerald accent for any platform chrome.
+    -->
+    <style name="Theme.QuietPing" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/qp_canvas</item>
+        <item name="android:colorBackground">@color/qp_canvas</item>
+
+        <!-- Material3 accent hooks -->
+        <item name="colorPrimary">@color/md_theme_dark_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_dark_onPrimary</item>
+        <item name="colorSecondary">@color/md_theme_dark_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_dark_onSecondary</item>
+        <item name="android:colorAccent">@color/qp_emerald_400</item>
+
+        <!-- Edge-to-edge: transparent status + navigation bars -->
+        <item name="android:statusBarColor">@color/qp_transparent</item>
+        <item name="android:navigationBarColor">@color/qp_transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+</resources>
