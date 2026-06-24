@@ -1,6 +1,13 @@
 package com.quietping.ui.nav
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -102,10 +110,18 @@ private fun QuietPingNavHost(
     val navigate: (Dest) -> Unit = { dest -> navController.navigateTo(dest) }
     val back: () -> Unit = { navController.popBackStack() }
 
+    // Reduced-motion gate (ThemeSettings.motionEnabled). When off, screen changes
+    // cross-fade instead of translating — no vestibular motion, cheaper on low-end.
+    val motionEnabled = LocalQuietPingTheme.current.motionEnabled
+
     NavHost(
         navController = navController,
         startDestination = Dest.Onboarding.route,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        enterTransition = { resolveEnter(motionEnabled) },
+        exitTransition = { resolveExit(motionEnabled) },
+        popEnterTransition = { resolvePopEnter(motionEnabled) },
+        popExitTransition = { resolvePopExit(motionEnabled) }
     ) {
         // ---- Full-screen flows (no bottom bar) ----
         composable(Dest.Onboarding.route) {
@@ -168,6 +184,58 @@ private fun QuietPingNavHost(
             PrivacyLockScreen(onNavigate = navigate, onBack = back)
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Screen transitions (PRD §9.1, DESIGN.md §5 motion). Forward navigation uses an
+// iOS-style horizontal push; back navigation reverses it; lateral moves between
+// the four bottom-nav roots cross-fade (no unambiguous slide direction). All
+// translation is gated by [QuietPingThemeState.motionEnabled] — reduced motion
+// degrades to a short fade, keeping the screen change legible without movement.
+// Springs come from [MotionTokens] so nav motion matches the rest of the system.
+// ---------------------------------------------------------------------------
+
+/** A short fade used as the reduced-motion fallback and for lateral tab swaps. */
+private val FadeSpec = tween<Float>(durationMillis = 150)
+
+/** True when [this] back-stack entry is one of the four bottom-nav roots. */
+private fun NavBackStackEntry.isBottomRoot(): Boolean =
+    Dest.bottomNavRoots.any { it.route == destination.route }
+
+/** Both ends of the transition are bottom-nav roots → a lateral tab swap. */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabSwap(): Boolean =
+    initialState.isBottomRoot() && targetState.isBottomRoot()
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.resolveEnter(
+    motion: Boolean
+): EnterTransition = when {
+    !motion || isTabSwap() -> fadeIn(FadeSpec)
+    else -> slideIntoContainer(SlideDirection.Start, MotionTokens.offsetSpring()) +
+        fadeIn(MotionTokens.signatureSpring())
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.resolveExit(
+    motion: Boolean
+): ExitTransition = when {
+    !motion || isTabSwap() -> fadeOut(FadeSpec)
+    else -> slideOutOfContainer(SlideDirection.Start, MotionTokens.offsetSpring()) +
+        fadeOut(MotionTokens.signatureSpring())
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.resolvePopEnter(
+    motion: Boolean
+): EnterTransition = when {
+    !motion || isTabSwap() -> fadeIn(FadeSpec)
+    else -> slideIntoContainer(SlideDirection.End, MotionTokens.offsetSpring()) +
+        fadeIn(MotionTokens.signatureSpring())
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.resolvePopExit(
+    motion: Boolean
+): ExitTransition = when {
+    !motion || isTabSwap() -> fadeOut(FadeSpec)
+    else -> slideOutOfContainer(SlideDirection.End, MotionTokens.offsetSpring()) +
+        fadeOut(MotionTokens.signatureSpring())
 }
 
 /**

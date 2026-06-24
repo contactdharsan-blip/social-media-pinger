@@ -6,7 +6,30 @@ source and sideload it onto your device.
 
 - **Build host:** Windows, macOS, or Linux
 - **Target device:** Android 8.0 (API 26) or newer
-- **Audience:** developers build the APK (Part 1); end users grant permissions (Part 3)
+- **Audience:** most users download a prebuilt APK (Part 0); developers build from source
+  (Part 1); end users grant permissions (Part 3)
+
+---
+
+## Part 0 — Download a prebuilt APK (no build tools)
+
+Every tagged release ships an installable APK built by GitHub Actions. This is the easiest path
+— you do **not** need the JDK, Android SDK, or Gradle.
+
+1. Go to the **[Releases page](https://github.com/contactdharsan-blip/social-media-pinger/releases/latest)**.
+2. Under **Assets**, download `QuietPing-<version>-debug.apk`.
+3. Transfer it to your Android device and tap to install (enable "install from unknown sources"
+   if your launcher/browser prompts).
+4. Continue to **Part 3** to grant permissions on first launch.
+
+> The released APK is a **debug** build — signed with Android's universal debug key, so it
+> installs on any device with zero signing setup. It is debuggable and not Play-Store-grade; for
+> a production-signed build, follow Part 1 and sign `assembleRelease` with your own keystore.
+
+> **Maintainers:** push a tag to publish a release —
+> `git tag v1.0 && git push origin v1.0`. The `Build & Release APK` workflow builds the APK and
+> attaches it to the release automatically. You can also run the workflow manually from the
+> **Actions** tab to produce a downloadable run artifact without cutting a release.
 
 ---
 
