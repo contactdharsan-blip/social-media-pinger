@@ -11,17 +11,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.quietping.domain.alerts.AlertDispatcherImpl
 import com.quietping.domain.settings.SettingsRepository
-import com.quietping.domain.settings.ThemeSettings
 import com.quietping.ui.lock.AppLockScreen
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.nav.QuietPingNavGraph
@@ -71,20 +71,12 @@ class MainActivity : FragmentActivity() {
         setContent {
             // Live theme so the Appearance screen's persisted accent / glass /
             // motion choices drive the whole app (null until loaded -> defaults).
-            val themeSettings by produceState<ThemeSettings?>(
-                initialValue = null,
-                settingsRepository
-            ) {
-                settingsRepository.theme.collect { value = it }
-            }
+            val themeSettings by settingsRepository.theme
+                .collectAsStateWithLifecycle(initialValue = null)
             // Tri-state (null = still loading) so the NavHost is created with the right
             // start destination and a returning user never flashes the onboarding wizard.
-            val onboardingDone by produceState<Boolean?>(
-                initialValue = null,
-                settingsRepository
-            ) {
-                settingsRepository.onboardingComplete.collect { value = it }
-            }
+            val onboardingDone by settingsRepository.onboardingComplete
+                .collectAsStateWithLifecycle(initialValue = null)
             QuietPingTheme(themeSettings = themeSettings) {
                 AppLockGate(settingsRepository) {
                     when (val done = onboardingDone) {
@@ -163,11 +155,9 @@ private fun AppLockGate(
     settingsRepository: SettingsRepository,
     content: @Composable () -> Unit
 ) {
-    val lockEnabled by produceState<Boolean?>(initialValue = null, settingsRepository) {
-        settingsRepository.privacy
-            .map { it.biometricLock }
-            .collect { value = it }
-    }
+    val lockEnabled by remember(settingsRepository) {
+        settingsRepository.privacy.map { it.biometricLock }
+    }.collectAsStateWithLifecycle(initialValue = null)
     var unlocked by rememberSaveable { mutableStateOf(false) }
 
     when {

@@ -110,7 +110,6 @@ fun OnboardingScreen(
     }
 
     val step = uiState.currentStep
-    val content = remember(step) { step.copyFor() }
 
     Box(
         modifier = Modifier
@@ -159,12 +158,19 @@ fun OnboardingScreen(
                 },
                 label = "onboarding-step",
                 modifier = Modifier.weight(1f)
-            ) { _ ->
+            ) { index ->
+                // Derive this pane's content from its own target index so the
+                // outgoing pane keeps its old copy through the slide (instead of
+                // both panes rendering the latest step's text).
+                val paneStep = OnboardingStep.ordered[
+                    index.coerceIn(0, OnboardingStep.ordered.lastIndex)
+                ]
+                val paneContent = remember(paneStep) { paneStep.copyFor() }
                 StepBody(
-                    icon = content.icon,
-                    title = content.title,
-                    rationale = content.rationale,
-                    optional = step.optional,
+                    icon = paneContent.icon,
+                    title = paneContent.title,
+                    rationale = paneContent.rationale,
+                    optional = paneStep.optional,
                     granted = uiState.isCurrentGranted
                 )
             }
