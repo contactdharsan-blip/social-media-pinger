@@ -36,5 +36,19 @@ architecture and engineering contract.
 
 - **Event-driven capture** — notification listener / SMS observer, no polling.
 - **On-device rule engine** — Aho-Corasick keyword + VIP matching decides what pings.
+  Rules can **alert** or **suppress**, and fire only inside a quiet-hours time window.
+- **Alert escalation** — standard, persistent (re-pings until you read it), or critical
+  (full-screen + alarm channel, bypasses DND). Repeat senders auto-escalate.
+- **Daily digest** — a once-a-day summary of everything that stayed silent.
+- **Privacy quartet** — screenshot block (`FLAG_SECURE`), content-hidden notifications,
+  a break-in log (failed-unlock attempts), and a decoy PIN that opens an empty vault.
+- **SMS productivity** — OTP detection with auto-cleanup, finance/bill detection.
 - **Encrypted at rest** — SQLCipher Room with a Keystore-wrapped key.
-- **Vault** — archives matched and deleted messages locally; lockable behind biometrics.
+- **Vault** — archives matched, edited (full version history), and deleted messages
+  locally; lockable behind biometrics. Includes a captured-media gallery; alert taps
+  deep-link straight to the thread.
+
+> **Deep capture (Face 2, rooted only).** An optional LSPosed module recovers
+> "delete-for-everyone" messages from inside the chat apps themselves. It ships **inert**
+> — it does nothing unless you are rooted with LSPosed *and* explicitly enable and scope
+> it. See [FACE2_XPOSED_RD.md](FACE2_XPOSED_RD.md).

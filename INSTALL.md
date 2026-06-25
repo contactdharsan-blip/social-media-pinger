@@ -137,6 +137,35 @@ walks you through each; manual paths below as backup.
 > Notification access and Accessibility survive reboot — a `BOOT_COMPLETED` receiver rebinds
 > capture automatically. No re-grant needed after restart.
 
+> **Critical alerts** also use `USE_FULL_SCREEN_INTENT`. On Android 14+ the OS may prompt
+> for it the first time a critical alert fires; allow it so escalated pings show full-screen.
+> The **decoy PIN** and **break-in log** are configured entirely in-app (Privacy screen) — no
+> system permission needed.
+
+---
+
+## Part 4 — Deep capture (Face 2, **rooted devices only**, optional)
+
+Everything above is **Face 1** — the universal product, works on any phone, no root.
+**Face 2** is an optional LSPosed module that hooks the chat apps in their own process to
+recover **"delete-for-everyone"** messages. It ships inside the same APK but is **completely
+inert** until every condition below is met — a non-rooted phone is unaffected.
+
+Requirements: a **rooted** device with **[LSPosed](https://github.com/JingMatrix/LSPosed)**
+(or a compatible Xposed framework) installed and active.
+
+1. Install the QuietPing APK as normal (Parts 0–2).
+2. Open **LSPosed → Modules**, enable **QuietPing**, and set its **scope** to the chat apps
+   you want (WhatsApp, Instagram, Messenger). The scope is fixed to those packages — it cannot
+   be widened.
+3. Force-stop and reopen the scoped chat apps so the hooks load.
+4. In QuietPing, open the **Deep Capture** screen and enable it. The app gates on root +
+   module presence; if either is missing it stays off.
+
+> Face 2 is a privacy *recovery* tool for your own device, not a surveillance feature. Recovered
+> messages land in the same encrypted vault as Face 1. See **[FACE2_XPOSED_RD.md](FACE2_XPOSED_RD.md)**
+> for the design and current hook status.
+
 ---
 
 ## Troubleshooting
