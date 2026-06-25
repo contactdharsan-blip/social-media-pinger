@@ -1,10 +1,5 @@
 package com.quietping.ui.components
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,21 +7,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.GlassFill
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.valentinilk.shimmer.shimmer
 
 /**
  * A single shimmering skeleton block (DESIGN.md `shimmer`, §5.5) — a frosted
- * placeholder with a looping diagonal highlight sweep. The sweep is suppressed
- * (static frost) when motion is disabled, satisfying the reduced-motion contract.
+ * placeholder with a looping highlight sweep, provided by `compose-shimmer`. The
+ * sweep is suppressed (static frost) when motion is disabled, satisfying the
+ * reduced-motion contract.
+ *
+ * The library's default `ShimmerBounds.Window` synchronizes the sweep across every
+ * block on screen, so a multi-row skeleton shimmers as one surface rather than each
+ * row animating out of phase.
  *
  * @param modifier     external layout modifier (set width via this).
  * @param height       the block height.
@@ -40,36 +38,15 @@ fun ShimmerBlock(
 ) {
     val motionEnabled = LocalQuietPingTheme.current.motionEnabled
     val shape = RoundedCornerShape(cornerRadius)
-
-    val highlight = GlassFill.copy(alpha = 0.18f)
-    val base = GlassFill.copy(alpha = 0.06f)
-
-    val brush = if (motionEnabled) {
-        val transition = rememberInfiniteTransition(label = "shimmer")
-        val progress by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1200),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "shimmerProgress"
-        )
-        val shift = progress * 600f
-        Brush.linearGradient(
-            colors = listOf(base, highlight, base),
-            start = Offset(shift - 300f, 0f),
-            end = Offset(shift, 0f)
-        )
-    } else {
-        Brush.linearGradient(listOf(base, base))
-    }
+    val base = GlassFill.copy(alpha = 0.10f)
 
     Box(
         modifier = modifier
             .height(height)
             .clip(shape)
-            .background(brush, shape)
+            // Reduced motion → static frost (no sweep); motion on → library shimmer.
+            .then(if (motionEnabled) Modifier.shimmer() else Modifier)
+            .background(base, shape)
     )
 }
 

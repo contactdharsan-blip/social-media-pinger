@@ -3,8 +3,10 @@ package com.quietping.ui.rules
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.quietping.domain.model.AlertStyle
 import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.Rule
+import com.quietping.domain.model.RuleAction
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
 import com.quietping.domain.model.VipContact
@@ -33,8 +35,16 @@ data class RuleDraft(
     val pattern: String = "",
     val soundPreset: SoundPreset = SoundPreset.DROPLET,
     val dndOverride: Boolean = false,
-    val enabled: Boolean = true
-)
+    val enabled: Boolean = true,
+    val alertStyle: AlertStyle = AlertStyle.STANDARD,
+    val action: RuleAction = RuleAction.ALERT,
+    val windowStartMin: Int = -1,
+    val windowEndMin: Int = -1
+) {
+    /** Whether a time window is configured (drives the editor's window toggle). */
+    val windowEnabled: Boolean
+        get() = windowStartMin in 0..1439 && windowEndMin in 0..1439 && windowStartMin != windowEndMin
+}
 
 /**
  * UI state for [RuleEditorScreen].
@@ -115,7 +125,11 @@ class RuleEditorViewModel @Inject constructor(
                             pattern = existing.pattern,
                             soundPreset = existing.soundPreset,
                             dndOverride = existing.dndOverride,
-                            enabled = existing.enabled
+                            enabled = existing.enabled,
+                            alertStyle = existing.alertStyle,
+                            action = existing.action,
+                            windowStartMin = existing.windowStartMin,
+                            windowEndMin = existing.windowEndMin
                         ),
                         isLoading = false
                     )
@@ -139,6 +153,23 @@ class RuleEditorViewModel @Inject constructor(
     fun setDndOverride(enabled: Boolean) = updateDraft { it.copy(dndOverride = enabled) }
 
     fun setEnabled(enabled: Boolean) = updateDraft { it.copy(enabled = enabled) }
+
+    fun setAlertStyle(style: AlertStyle) = updateDraft { it.copy(alertStyle = style) }
+
+    fun setAction(action: RuleAction) = updateDraft { it.copy(action = action) }
+
+    /** Enable/disable the active-time window. Enabling seeds a 9am–5pm default. */
+    fun setWindowEnabled(enabled: Boolean) = updateDraft {
+        if (enabled) {
+            if (it.windowEnabled) it else it.copy(windowStartMin = 9 * 60, windowEndMin = 17 * 60)
+        } else {
+            it.copy(windowStartMin = -1, windowEndMin = -1)
+        }
+    }
+
+    fun setWindowStart(minuteOfDay: Int) = updateDraft { it.copy(windowStartMin = minuteOfDay) }
+
+    fun setWindowEnd(minuteOfDay: Int) = updateDraft { it.copy(windowEndMin = minuteOfDay) }
 
     /** Add a VIP [handle] for the draft's current app (used by the VIP picker). */
     fun addVip(handle: String) {
@@ -175,7 +206,11 @@ class RuleEditorViewModel @Inject constructor(
                     pattern = draft.pattern.trim(),
                     soundPreset = draft.soundPreset,
                     dndOverride = draft.dndOverride,
-                    enabled = draft.enabled
+                    enabled = draft.enabled,
+                    alertStyle = draft.alertStyle,
+                    action = draft.action,
+                    windowStartMin = draft.windowStartMin,
+                    windowEndMin = draft.windowEndMin
                 )
             )
             _uiState.update { it.copy(saved = true) }

@@ -1,11 +1,15 @@
 package com.quietping.di
 
 import com.quietping.data.datastore.SettingsRepositoryImpl
+import com.quietping.data.repo.BreakInRepositoryImpl
 import com.quietping.data.repo.MatchRepositoryImpl
+import com.quietping.data.repo.MediaRepositoryImpl
 import com.quietping.data.repo.MessageRepositoryImpl
 import com.quietping.data.repo.RuleRepositoryImpl
 import com.quietping.data.repo.VipRepositoryImpl
+import com.quietping.domain.repo.BreakInRepository
 import com.quietping.domain.repo.MatchRepository
+import com.quietping.domain.repo.MediaRepository
 import com.quietping.domain.repo.MessageRepository
 import com.quietping.domain.repo.RuleRepository
 import com.quietping.domain.repo.VipRepository
@@ -47,5 +51,13 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
+    abstract fun bindMediaRepository(impl: MediaRepositoryImpl): MediaRepository
+
+    @Binds
+    @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBreakInRepository(impl: BreakInRepositoryImpl): BreakInRepository
 }

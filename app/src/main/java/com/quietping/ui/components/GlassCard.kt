@@ -1,8 +1,6 @@
 package com.quietping.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,17 +10,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.quietping.ui.theme.Emerald300
+import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
-import com.quietping.ui.theme.MotionTokens
+import com.quietping.ui.theme.Motion
+import com.quietping.ui.theme.Teal400
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.pressElevation
+import com.quietping.ui.theme.sheen
+import com.quietping.ui.theme.travelingGlowBorder
 
 /**
  * The primary liquid-glass surface (DESIGN.md §7.1) — a frosted, rounded panel.
@@ -36,6 +39,11 @@ import com.quietping.ui.theme.glass
  * @param cornerRadius  glass corner radius (default the --radius-2xl card radius).
  * @param intensity     glass alpha multiplier (defaults to the user's glass intensity).
  * @param contentPadding inner padding around [content].
+ * @param glow          when true, rims the card with a travelling accent glow border
+ *                      (motion-gated; static accent edge under reduced motion).
+ * @param sheen         when true, sweeps a faint diagonal highlight across the surface
+ *                      (motion-gated; no-op under reduced motion).
+ * @param glowColors    accent ramp for the travelling glow lobe.
  * @param content       the card body, laid out in a [Column].
  */
 @Composable
@@ -45,25 +53,21 @@ fun GlassCard(
     cornerRadius: Dp = GlassDefaults.CornerRadius,
     intensity: Float = LocalQuietPingTheme.current.glassIntensity,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    glow: Boolean = false,
+    sheen: Boolean = false,
+    glowColors: List<Color> = listOf(Emerald400, Teal400, Emerald300),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val motionEnabled = LocalQuietPingTheme.current.motionEnabled
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed && motionEnabled && onClick != null) 0.97f else 1f,
-        animationSpec = MotionTokens.floatSpring,
-        label = "glassCardPressScale"
-    )
 
     val shape = RoundedCornerShape(cornerRadius)
-    val base = modifier
-        .graphicsLayer {
-            scaleX = pressScale
-            scaleY = pressScale
-        }
+    var base = modifier
+        .pressElevation(interaction, shape, pressedScale = Motion.PressScaleCard)
         .clip(shape)
         .glass(intensity = intensity, cornerRadius = cornerRadius)
+
+    if (sheen) base = base.sheen()
+    if (glow) base = base.travelingGlowBorder(cornerRadius = cornerRadius, colors = glowColors)
 
     val clickable =
         if (onClick != null) {

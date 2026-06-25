@@ -27,7 +27,8 @@ fun ConversationEntity.toDomain(): Conversation = Conversation(
     appPackage = appPackage,
     conversationKey = conversationKey,
     displayName = displayName,
-    isGroup = isGroup
+    isGroup = isGroup,
+    watched = watched
 )
 
 fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
@@ -35,7 +36,8 @@ fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
     appPackage = appPackage,
     conversationKey = conversationKey,
     displayName = displayName,
-    isGroup = isGroup
+    isGroup = isGroup,
+    watched = watched
 )
 
 // ---- Message version ----
@@ -86,7 +88,11 @@ fun RuleEntity.toDomain(): Rule = Rule(
     pattern = pattern,
     soundPreset = soundPreset,
     dndOverride = dndOverride,
-    enabled = enabled
+    enabled = enabled,
+    alertStyle = alertStyle,
+    action = action,
+    windowStartMin = windowStartMin,
+    windowEndMin = windowEndMin
 )
 
 fun Rule.toEntity(): RuleEntity = RuleEntity(
@@ -96,7 +102,11 @@ fun Rule.toEntity(): RuleEntity = RuleEntity(
     pattern = pattern,
     soundPreset = soundPreset,
     dndOverride = dndOverride,
-    enabled = enabled
+    enabled = enabled,
+    alertStyle = alertStyle,
+    action = action,
+    windowStartMin = windowStartMin,
+    windowEndMin = windowEndMin
 )
 
 // ---- VIP contact ----

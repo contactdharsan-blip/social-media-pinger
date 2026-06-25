@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Face 2 (Xposed/LSPosed) scope hint. LSPosed pre-suggests ONLY these packages when the
+      user enables the module — mirroring the "accessibility is scoped to target packages"
+      invariant. Keep this list = the chat-app targets in FACE2_XPOSED_RD.md and nothing else.
+    -->
+    <string-array name="xposed_scope">
+        <item>com.whatsapp</item>
+        <item>com.whatsapp.w4b</item>
+        <item>com.instagram.android</item>
+        <item>com.facebook.orca</item>
+        <item>com.facebook.katana</item>
+    </string-array>
+</resources>

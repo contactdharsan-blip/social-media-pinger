@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.TextPrimary
+import com.quietping.ui.theme.animateSizeChange
 import com.quietping.ui.theme.TextTertiary
 
 /**
@@ -76,7 +77,9 @@ fun KeywordEditor(
     ) {
         if (keywords.isNotEmpty()) {
             FlowRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateSizeChange(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {

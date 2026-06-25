@@ -26,6 +26,7 @@ class VaultManagerImplTest {
         val conversationStore = seedConversations.toMutableList()
         val messageStore = seedMessages.toMutableList()
         private var nextId = (seedMessages.maxOfOrNull { it.id } ?: 0L) + 1
+        private var nextConversationId = (seedConversations.maxOfOrNull { it.id } ?: 0L) + 1
 
         override fun conversations(): Flow<List<Conversation>> = flowOf(conversationStore.toList())
 
@@ -50,9 +51,45 @@ class VaultManagerImplTest {
             return message.id
         }
 
+        override suspend fun resolveConversationId(
+            appPackage: AppPackage,
+            conversationKey: String,
+            displayName: String,
+            isGroup: Boolean
+        ): Long {
+            val existing = conversationStore.firstOrNull {
+                it.appPackage == appPackage && it.conversationKey == conversationKey
+            }
+            if (existing != null) return existing.id
+            val created = Conversation(
+                id = nextConversationId++,
+                appPackage = appPackage,
+                conversationKey = conversationKey,
+                displayName = displayName,
+                isGroup = isGroup
+            )
+            conversationStore.add(created)
+            return created.id
+        }
+
         override suspend fun purgeOlderThan(epochMillis: Long) {
             messageStore.removeAll { it.capturedAt < epochMillis }
         }
+
+        override suspend fun conversationIdFor(appPackage: AppPackage, conversationKey: String): Long? =
+            conversationStore.firstOrNull {
+                it.appPackage == appPackage && it.conversationKey == conversationKey
+            }?.id
+
+        override suspend fun conversationById(id: Long): Conversation? =
+            conversationStore.firstOrNull { it.id == id }
+
+        override suspend fun setWatched(id: Long, watched: Boolean) {
+            val idx = conversationStore.indexOfFirst { it.id == id }
+            if (idx >= 0) conversationStore[idx] = conversationStore[idx].copy(watched = watched)
+        }
+
+        override suspend fun purgeOtpOlderThan(epochMillis: Long): Int = 0
     }
 
     private val conversation = Conversation(

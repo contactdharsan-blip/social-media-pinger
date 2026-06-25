@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,9 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.Motion
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.pressElevation
 
 /**
  * A standard list row: optional leading icon (in an accent-tinted disc), a
@@ -51,10 +55,12 @@ fun ListRow(
 ) {
     val accent = LocalQuietPingTheme.current.accent
     val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(GlassDefaults.CornerRadiusMd)
 
     val rowModifier = modifier
         .fillMaxWidth()
         .defaultMinSize(minHeight = 56.dp)
+        .pressElevation(interaction, shape, pressedScale = Motion.PressScaleRow)
         .then(
             if (onClick != null) {
                 Modifier.clickable(

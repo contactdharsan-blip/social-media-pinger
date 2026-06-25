@@ -10,14 +10,20 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.quietping.domain.model.AlertStyle
 import com.quietping.domain.model.MatchLog
 import com.quietping.domain.model.MatchResult
 import com.quietping.domain.model.Rule
 import com.quietping.domain.repo.MatchRepository
+import com.quietping.domain.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.absoluteValue
 
 /**
@@ -42,11 +48,29 @@ import kotlin.math.absoluteValue
 class AlertDispatcherImpl(
     private val context: Context,
     private val matchRepository: MatchRepository,
+    private val settingsRepository: SettingsRepository,
     private val channels: NotificationChannels = NotificationChannels(context),
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val repeatTracker: RepeatSenderTracker = RepeatSenderTracker()
 ) : AlertDispatcher {
 
     private val notifier = NotificationManagerCompat.from(context)
+
+    /** Active re-ping loops, keyed by conversation id; cancelled on read. */
+    private val reminderJobs = ConcurrentHashMap<Long, Job>()
+
+    /**
+     * Latest value of the "hide notification content" privacy setting, mirrored from
+     * DataStore so the hot [fire] path reads a plain field instead of suspending.
+     */
+    @Volatile
+    private var hideContent: Boolean = false
+
+    init {
+        scope.launch {
+            settingsRepository.privacy.collect { hideContent = it.hideNotificationContent }
+        }
+    }
 
     override fun ensureChannels() {
         channels.ensureDefaults()
@@ -54,18 +78,33 @@ class AlertDispatcherImpl(
 
     override fun fire(match: MatchResult) {
         val rule = match.rule
+        val conversationId = match.message.conversationId
+
+        // Repeated-sender break-through: a second message from the same sender within
+        // the burst window escalates to CRITICAL regardless of the rule's own style.
+        val burst = repeatTracker.shouldBreakThrough(conversationId, match.message.sender)
+        val style = if (burst) AlertStyle.CRITICAL else rule.alertStyle
+        val critical = style == AlertStyle.CRITICAL
+
         val channelId = channels.ensureChannel(
             type = rule.type,
             preset = rule.soundPreset,
-            bypassDnd = rule.dndOverride
+            bypassDnd = rule.dndOverride,
+            critical = critical
         )
 
         val notificationId = notificationIdFor(match)
         if (canPost()) {
-            val notification = buildNotification(match, channelId)
+            val notification = buildNotification(match, channelId, notificationId, critical)
             // Guarded by canPost(); the lint suppression documents that contract.
             @Suppress("MissingPermission")
             notifier.notify(notificationId, notification)
+
+            // PERSISTENT (and not already a one-shot critical): re-ping until the
+            // source notification is removed (read) or the repeat cap is reached.
+            if (style == AlertStyle.PERSISTENT) {
+                startReminder(conversationId, notificationId, notification)
+            }
         }
 
         // Always log the match (the feed should reflect a fire even if the OS
@@ -83,36 +122,92 @@ class AlertDispatcherImpl(
         }
     }
 
-    private fun buildNotification(match: MatchResult, channelId: String): Notification {
+    override fun cancelReminders(conversationId: Long) {
+        reminderJobs.remove(conversationId)?.cancel()
+    }
+
+    /**
+     * Re-post [notification] on an interval until [MAX_REMINDERS] is reached or the
+     * loop is cancelled by [cancelReminders] (the read signal). Keyed by
+     * [conversationId]; a fresh persistent fire for the same conversation restarts it.
+     */
+    private fun startReminder(conversationId: Long, notificationId: Int, notification: Notification) {
+        reminderJobs.remove(conversationId)?.cancel()
+        reminderJobs[conversationId] = scope.launch {
+            var count = 0
+            while (count < MAX_REMINDERS) {
+                delay(REMINDER_INTERVAL_MS)
+                if (!canPost()) break
+                @Suppress("MissingPermission")
+                notifier.notify(notificationId, notification)
+                count++
+            }
+            reminderJobs.remove(conversationId)
+        }
+    }
+
+    private fun buildNotification(
+        match: MatchResult,
+        channelId: String,
+        notificationId: Int,
+        critical: Boolean
+    ): Notification {
         val rule = match.rule
         val message = match.message
-        val title = alertTitle(rule)
-        val body = previewBody(message.currentBody, message.sender)
+        // Content-hidden mode (privacy): show a generic title/body and keep the real
+        // text off the lock screen entirely (VISIBILITY_SECRET).
+        val title = if (hideContent) GENERIC_TITLE else alertTitle(rule)
+        val body = if (hideContent) GENERIC_BODY else previewBody(message.currentBody, message.sender)
+
+        val intent = launchIntent(message.conversationId, notificationId)
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(smallIcon())
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
             .setOnlyAlertOnce(false)
+            .setVisibility(
+                if (hideContent) NotificationCompat.VISIBILITY_SECRET
+                else NotificationCompat.VISIBILITY_PRIVATE
+            )
 
-        launchIntent()?.let { builder.setContentIntent(it) }
+        if (!hideContent) {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        }
+        intent?.let { builder.setContentIntent(it) }
+        // CRITICAL: launch a full-screen heads-up that wakes the screen even from
+        // lock / DND (BuzzKill "Alarm" pattern). Needs USE_FULL_SCREEN_INTENT.
+        if (critical && intent != null) {
+            builder.setFullScreenIntent(intent, true)
+        }
         return builder.build()
     }
 
-    /** A PendingIntent that re-opens QuietPing's launcher Activity, or null. */
-    private fun launchIntent(): PendingIntent? {
+    /**
+     * A PendingIntent that re-opens QuietPing's launcher Activity deep-linked to the
+     * thread the alert fired from, or null.
+     *
+     * The [conversationId] rides as an extra; [com.quietping.MainActivity] reads it and
+     * drives the nav graph to the matching [com.quietping.ui.nav.Dest.VaultThread].
+     *
+     * [requestCode] is the per-match notification id: PendingIntent equality ignores
+     * extras, so distinct alerts MUST use distinct request codes — otherwise
+     * FLAG_UPDATE_CURRENT would collapse every live alert onto one intent and they'd
+     * all open the most recently fired thread.
+     */
+    private fun launchIntent(conversationId: Long, requestCode: Int): PendingIntent? {
         val launch = context.packageManager
             .getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_CONVERSATION_ID, conversationId)
             }
             ?: return null
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getActivity(context, /* requestCode = */ 0, launch, flags)
+        return PendingIntent.getActivity(context, requestCode, launch, flags)
     }
 
     private fun alertTitle(rule: Rule): String = when (rule.type) {
@@ -162,7 +257,18 @@ class AlertDispatcherImpl(
         return if (id == 0) 1 else id
     }
 
-    private companion object {
+    companion object {
         const val MAX_PREVIEW = 240
+
+        /** Intent extra carrying the conversation id an alert deep-links to. */
+        const val EXTRA_CONVERSATION_ID = "com.quietping.extra.CONVERSATION_ID"
+
+        /** Re-ping cadence and cap for a PERSISTENT rule. */
+        const val REMINDER_INTERVAL_MS = 60_000L
+        const val MAX_REMINDERS = 5
+
+        /** Generic strings used when content-hidden privacy mode is on. */
+        const val GENERIC_TITLE = "QuietPing"
+        const val GENERIC_BODY = "New alert — open to view"
     }
 }

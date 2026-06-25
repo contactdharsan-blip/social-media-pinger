@@ -3,13 +3,19 @@ package com.quietping.domain.model
 /**
  * A logical conversation (1:1 or group) within a specific app. [conversationKey]
  * is the stable per-app identifier used to dedupe messages into a thread.
+ *
+ * @param watched whether incoming messages in this conversation are evaluated for
+ *   alerts. Only meaningful for groups ([isGroup] = true): a muted group
+ *   (`watched = false`) is still archived to the Vault but never reaches the
+ *   RuleEngine. New conversations default to watched; 1:1 chats ignore the flag.
  */
 data class Conversation(
     val id: Long,
     val appPackage: AppPackage,
     val conversationKey: String,
     val displayName: String,
-    val isGroup: Boolean
+    val isGroup: Boolean,
+    val watched: Boolean = true
 )
 
 /**
@@ -45,10 +51,35 @@ data class Message(
 )
 
 /**
+ * How an alert escalates when its rule fires (competitor parity — BuzzKill "Remind
+ * me" / "Alarm", Missed-Notifications-Reminder).
+ *  - [STANDARD]   one IMPORTANCE_HIGH heads-up (today's behavior).
+ *  - [PERSISTENT] re-ping on an interval until the source notification is read
+ *                 (removed), bounded by a max repeat count.
+ *  - [CRITICAL]   full-screen intent + ALARM-stream channel that pierces DND.
+ */
+enum class AlertStyle { STANDARD, PERSISTENT, CRITICAL }
+
+/**
+ * What the engine does when a rule matches.
+ *  - [ALERT]    fire the alert (default).
+ *  - [SUPPRESS] block — archive the message as blocked and fire nothing
+ *               (keyword/phrase block, Pulse-style).
+ */
+enum class RuleAction { ALERT, SUPPRESS }
+
+/**
  * A user-defined alert condition for a given app. When [enabled], the RuleEngine
  * evaluates incoming messages of [appPackage] against [type] using [pattern]
  * (keyword/regex/handle depending on type). On match, AlertDispatcher fires using
  * [soundPreset], optionally bypassing DND via [dndOverride].
+ *
+ * @param alertStyle   escalation behavior on match (§ Bundle 1).
+ * @param action       fire vs. suppress (§ Bundle 4 keyword block).
+ * @param windowStartMin start of the rule's active window, minutes-since-midnight
+ *                       (0..1439); `-1` ⇒ no window (always active).
+ * @param windowEndMin   end of the active window, minutes-since-midnight (exclusive);
+ *                       wraps past midnight when end < start (e.g. 22:00→07:00).
  */
 data class Rule(
     val id: Long,
@@ -57,8 +88,30 @@ data class Rule(
     val pattern: String,
     val soundPreset: SoundPreset,
     val dndOverride: Boolean,
-    val enabled: Boolean
-)
+    val enabled: Boolean,
+    val alertStyle: AlertStyle = AlertStyle.STANDARD,
+    val action: RuleAction = RuleAction.ALERT,
+    val windowStartMin: Int = -1,
+    val windowEndMin: Int = -1
+) {
+    /** True when this rule has a configured active window (vs. always-on). */
+    val hasWindow: Boolean
+        get() = windowStartMin in 0..1439 && windowEndMin in 0..1439 && windowStartMin != windowEndMin
+
+    /**
+     * Whether the rule is active at [minuteOfDay] (0..1439). Always true when no
+     * window is set. Handles a window that wraps past midnight.
+     */
+    fun activeAt(minuteOfDay: Int): Boolean {
+        if (!hasWindow) return true
+        return if (windowStartMin < windowEndMin) {
+            minuteOfDay >= windowStartMin && minuteOfDay < windowEndMin
+        } else {
+            // wraps midnight: active from start..24:00 and 00:00..end
+            minuteOfDay >= windowStartMin || minuteOfDay < windowEndMin
+        }
+    }
+}
 
 /**
  * A starred contact for [appPackage]. Messages whose sender matches [handle]
@@ -89,4 +142,36 @@ data class MatchLog(
 data class MatchResult(
     val rule: Rule,
     val message: Message
+)
+
+/**
+ * One recorded failed app-unlock attempt (privacy break-in log). [reason] is a
+ * coarse tag (e.g. "biometric_failed", "decoy_pin"); no content, no image.
+ */
+data class BreakInEvent(
+    val id: Long,
+    val attemptedAt: Long,
+    val reason: String
+)
+
+/**
+ * A single file held in the on-device media vault — an image / video / voice note
+ * QuietPing copied out of a messaging app before a "delete for everyone" could
+ * remove the original. There is no message link in the model, so this is a flat
+ * gallery entry, not a thread reference.
+ *
+ * @param path         absolute path to the file in the app's private storage
+ *                     (`filesDir/media_vault/`); also the stable list key.
+ * @param appLabel     lower-case source-app tag parsed from the file name
+ *                     (e.g. "whatsapp"), or "" when it can't be determined.
+ * @param displayName  the original file name the source app used.
+ * @param sizeBytes    file size in bytes.
+ * @param lastModified capture time (file mtime, epoch millis) — drives ordering.
+ */
+data class MediaItem(
+    val path: String,
+    val appLabel: String,
+    val displayName: String,
+    val sizeBytes: Long,
+    val lastModified: Long
 )

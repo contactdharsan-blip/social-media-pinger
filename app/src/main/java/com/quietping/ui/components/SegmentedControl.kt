@@ -73,14 +73,21 @@ fun <T> SegmentedControl(
             label = "segmentIndicatorOffset"
         )
 
-        // Sliding glass indicator behind the active tab.
+        // Sliding glass indicator behind the active tab: a frosted pill (glass fill + lit edge)
+        // with a faint accent wash, so it reads as liquid glass rather than a flat tint.
         Box(
             modifier = Modifier
                 .width(segmentWidth)
                 .fillMaxSize()
                 .graphicsLayer { translationX = indicatorOffset.toPx() }
-                .clip(RoundedCornerShape(GlassDefaults.CornerRadiusMd))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.20f))
+                .glass(
+                    intensity = LocalQuietPingTheme.current.glassIntensity,
+                    cornerRadius = GlassDefaults.CornerRadiusMd
+                )
+                .background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                    RoundedCornerShape(GlassDefaults.CornerRadiusMd)
+                )
         )
 
         Row(modifier = Modifier.fillMaxSize()) {

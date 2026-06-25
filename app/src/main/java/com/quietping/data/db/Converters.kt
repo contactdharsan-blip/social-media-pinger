@@ -1,9 +1,11 @@
 package com.quietping.data.db
 
 import androidx.room.TypeConverter
+import com.quietping.domain.model.AlertStyle
 import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.CaptureSource
 import com.quietping.domain.model.MessageStatus
+import com.quietping.domain.model.RuleAction
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
 
@@ -43,4 +45,16 @@ class Converters {
 
     @TypeConverter
     fun stringToSoundPreset(value: String): SoundPreset = SoundPreset.valueOf(value)
+
+    @TypeConverter
+    fun alertStyleToString(value: AlertStyle): String = value.name
+
+    @TypeConverter
+    fun stringToAlertStyle(value: String): AlertStyle = AlertStyle.valueOf(value)
+
+    @TypeConverter
+    fun ruleActionToString(value: RuleAction): String = value.name
+
+    @TypeConverter
+    fun stringToRuleAction(value: String): RuleAction = RuleAction.valueOf(value)
 }

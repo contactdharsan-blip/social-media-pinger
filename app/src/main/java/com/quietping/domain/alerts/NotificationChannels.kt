@@ -41,18 +41,22 @@ class NotificationChannels(
     fun ensureChannel(
         type: TriggerType,
         preset: SoundPreset,
-        bypassDnd: Boolean
+        bypassDnd: Boolean,
+        critical: Boolean = false
     ): String {
-        val id = channelId(type, preset, bypassDnd)
+        // A CRITICAL alert always pierces DND (it is the whole point), so a critical
+        // channel implies bypass regardless of the rule's own dndOverride.
+        val effectiveBypass = bypassDnd || critical
+        val id = channelId(type, preset, effectiveBypass, critical)
         // Already created? Reuse — don't clobber user edits.
         if (manager.getNotificationChannel(id) != null) return id
 
         val channel = NotificationChannel(id, channelName(type, preset), IMPORTANCE).apply {
             description = channelDescription(type)
             enableLights(true)
-            configureSound(this, preset)
+            configureSound(this, preset, critical)
             configureVibration(this, preset)
-            if (bypassDnd) {
+            if (effectiveBypass) {
                 // Effective only if the app has ACCESS_NOTIFICATION_POLICY; harmless
                 // otherwise (the system ignores it).
                 setBypassDnd(true)
@@ -71,6 +75,27 @@ class NotificationChannels(
         for (type in TriggerType.entries) {
             ensureChannel(type, defaultPresetFor(type), bypassDnd = false)
         }
+    }
+
+    /**
+     * Ensure the low-importance digest channel exists and return its id. Digests are
+     * a quiet once-daily summary (Daywise / iOS Scheduled Summary parity), so this
+     * channel is IMPORTANCE_LOW — no heads-up, no sound.
+     */
+    fun ensureDigestChannel(): String {
+        if (manager.getNotificationChannel(DIGEST_CHANNEL_ID) == null) {
+            val channel = NotificationChannel(
+                DIGEST_CHANNEL_ID,
+                "Daily digest",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "A once-daily summary of low-priority matches."
+                enableVibration(false)
+                setSound(null, null)
+            }
+            manager.createNotificationChannel(channel)
+        }
+        return DIGEST_CHANNEL_ID
     }
 
     /** Resolve a preset's bundled tone in res/raw to a content Uri, or null (silent). */
@@ -92,14 +117,17 @@ class NotificationChannels(
         SoundPreset.SILENT -> longArrayOf(0, 150, 120, 150) // vibrate-only condition
     }
 
-    private fun configureSound(channel: NotificationChannel, preset: SoundPreset) {
+    private fun configureSound(channel: NotificationChannel, preset: SoundPreset, critical: Boolean = false) {
         val uri = soundUriFor(preset)
         if (uri == null) {
             channel.setSound(null, null) // Silent+: no tone
             return
         }
+        // A CRITICAL channel routes its tone through the ALARM usage so it sounds
+        // even while the phone is in Do-Not-Disturb / silent (SOS-Ring pattern).
+        val usage = if (critical) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_NOTIFICATION
         val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setUsage(usage)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
         channel.setSound(uri, attrs)
@@ -139,6 +167,9 @@ class NotificationChannels(
     companion object {
         private const val IMPORTANCE = NotificationManager.IMPORTANCE_HIGH
 
+        /** Stable id for the low-importance daily-digest channel. */
+        const val DIGEST_CHANNEL_ID = "qp_v1_digest"
+
         /** PRD §8 default preset per condition type. */
         fun defaultPresetFor(type: TriggerType): SoundPreset = when (type) {
             TriggerType.NAME_MENTION -> SoundPreset.PULSE
@@ -154,9 +185,15 @@ class NotificationChannels(
          * future change to channel design can migrate without colliding with
          * channels the user already tuned.
          */
-        fun channelId(type: TriggerType, preset: SoundPreset, bypassDnd: Boolean): String {
+        fun channelId(
+            type: TriggerType,
+            preset: SoundPreset,
+            bypassDnd: Boolean,
+            critical: Boolean = false
+        ): String {
             val dnd = if (bypassDnd) "dnd" else "std"
-            return "qp_v1_${type.name.lowercase()}_${preset.name.lowercase()}_$dnd"
+            val crit = if (critical) "_crit" else ""
+            return "qp_v1_${type.name.lowercase()}_${preset.name.lowercase()}_$dnd$crit"
         }
     }
 }

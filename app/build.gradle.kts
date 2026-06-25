@@ -71,6 +71,18 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    // UI / effects — on-device only. Haze = real backdrop blur; compose-shimmer = skeleton
+    // loaders; Coil3 CORE (no coil-network-*) + Telephoto = local vault media display/zoom.
+    implementation(libs.haze)
+    implementation(libs.compose.shimmer)
+    implementation(libs.coil.compose)
+    implementation(libs.telephoto.zoomable)
+
+    // Xposed/LSPosed module API — compileOnly: classes come from the LSPosed framework at
+    // runtime and are NOT packaged into the APK (keeps the no-INTERNET / no-extra-runtime-lib
+    // guarantee). Powers Face 2 (in-process deleted-message recovery). See FACE2_XPOSED_RD.md.
+    compileOnly(libs.xposed.api)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

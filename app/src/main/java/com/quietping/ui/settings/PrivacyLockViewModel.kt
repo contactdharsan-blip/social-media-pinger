@@ -2,7 +2,10 @@ package com.quietping.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.quietping.domain.model.BreakInEvent
+import com.quietping.domain.repo.BreakInRepository
 import com.quietping.domain.repo.MessageRepository
+import com.quietping.domain.security.PinHasher
 import com.quietping.domain.settings.PrivacySettings
 import com.quietping.domain.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +38,8 @@ sealed interface PurgeResult {
  */
 data class PrivacyLockUiState(
     val privacy: PrivacySettings = PrivacySettings(),
-    val purgeResult: PurgeResult? = null
+    val purgeResult: PurgeResult? = null,
+    val breakIns: List<BreakInEvent> = emptyList()
 )
 
 /**
@@ -47,14 +51,19 @@ data class PrivacyLockUiState(
 @HiltViewModel
 class PrivacyLockViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val messageRepository: MessageRepository
+    private val messageRepository: MessageRepository,
+    private val breakInRepository: BreakInRepository
 ) : ViewModel() {
 
     private val purgeResult = MutableStateFlow<PurgeResult?>(null)
 
     val uiState: StateFlow<PrivacyLockUiState> =
-        combine(settingsRepository.privacy, purgeResult) { privacy, purge ->
-            PrivacyLockUiState(privacy = privacy, purgeResult = purge)
+        combine(
+            settingsRepository.privacy,
+            purgeResult,
+            breakInRepository.recent(BREAK_IN_LIMIT)
+        ) { privacy, purge, breakIns ->
+            PrivacyLockUiState(privacy = privacy, purgeResult = purge, breakIns = breakIns)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -62,10 +71,36 @@ class PrivacyLockViewModel @Inject constructor(
         )
 
     /** Toggle the biometric app lock. */
-    fun setBiometricLock(enabled: Boolean) {
+    fun setBiometricLock(enabled: Boolean) = updatePrivacy { it.copy(biometricLock = enabled) }
+
+    /** Toggle FLAG_SECURE screenshot/recording blocking. */
+    fun setScreenshotBlock(enabled: Boolean) = updatePrivacy { it.copy(screenshotBlock = enabled) }
+
+    /** Toggle generic (content-hidden) alert notifications. */
+    fun setHideNotificationContent(enabled: Boolean) =
+        updatePrivacy { it.copy(hideNotificationContent = enabled) }
+
+    /** Toggle recording of failed unlock attempts. */
+    fun setBreakInLogEnabled(enabled: Boolean) = updatePrivacy { it.copy(breakInLogEnabled = enabled) }
+
+    /** Set (and enable) a decoy PIN; stores only a salted hash. Blank clears it. */
+    fun setDecoyPin(pin: String) {
+        val trimmed = pin.trim()
+        if (trimmed.isEmpty()) { clearDecoyPin(); return }
+        updatePrivacy { it.copy(decoyPinEnabled = true, decoyPinHash = PinHasher.hash(trimmed)) }
+    }
+
+    /** Disable and forget the decoy PIN. */
+    fun clearDecoyPin() = updatePrivacy { it.copy(decoyPinEnabled = false, decoyPinHash = "") }
+
+    /** Clear the break-in attempt log. */
+    fun clearBreakIns() {
+        viewModelScope.launch { breakInRepository.clear() }
+    }
+
+    private inline fun updatePrivacy(crossinline transform: (PrivacySettings) -> PrivacySettings) {
         viewModelScope.launch {
-            val current = uiState.value.privacy
-            settingsRepository.setPrivacy(current.copy(biometricLock = enabled))
+            settingsRepository.setPrivacy(transform(uiState.value.privacy))
         }
     }
 
@@ -93,5 +128,9 @@ class PrivacyLockViewModel @Inject constructor(
     /** Acknowledge and clear the transient purge feedback. */
     fun consumePurgeResult() {
         purgeResult.update { null }
+    }
+
+    private companion object {
+        const val BREAK_IN_LIMIT = 20
     }
 }

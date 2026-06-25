@@ -24,7 +24,7 @@ import com.quietping.domain.model.TriggerType
 object PatternCatalog {
 
     /** Monotonic revision of the pattern set. Bump on every functional change. */
-    const val CATALOG_VERSION: Int = 1
+    const val CATALOG_VERSION: Int = 2
 
     private val CI = setOf(RegexOption.IGNORE_CASE)
 
@@ -132,6 +132,44 @@ object PatternCatalog {
         Regex("""deleted a message""", CI)
     )
 
+    /**
+     * Phrases that mark an SMS as carrying a one-time passcode / verification code
+     * (SMS Organizer / Google Messages parity). Paired with [OTP_CODE] to extract the
+     * digits. Kept deliberately tight so ordinary numbers (prices, phone numbers)
+     * don't read as OTPs.
+     */
+    private val OTP_CONTEXT: List<Regex> = listOf(
+        Regex("""\bOTP\b""", CI),
+        Regex("""one[- ]time (pass)?code""", CI),
+        Regex("""verification code""", CI),
+        Regex("""security code""", CI),
+        Regex("""\bauth(entication)? code""", CI),
+        Regex("""\b2fa\b""", CI),
+        Regex("""\bpin\b.*\bcode\b""", CI),
+        Regex("""code (is|:)""", CI),
+        // "code" immediately followed by digits (optionally a colon), e.g. "use code 90210".
+        Regex("""\bcode\b[\s:]*\d""", CI),
+        Regex("""is your .*code""", CI),
+        Regex("""do not share""", CI)
+    )
+
+    /** A 4–8 digit code, optionally hyphen-grouped (e.g. "123-456"). */
+    private val OTP_CODE: Regex = Regex("""\b(\d{3}[- ]?\d{3}|\d{4,8})\b""")
+
+    /**
+     * Phrases that mark an SMS as a finance / bill / payment notice (SMS Organizer
+     * "smart reminders" parity). Detection only — surfacing is left to the caller.
+     */
+    private val FINANCE_CONTEXT: List<Regex> = listOf(
+        Regex("""\b(bill|invoice|statement)\b""", CI),
+        Regex("""\b(due|overdue|payment due)\b""", CI),
+        Regex("""\b(minimum|min) (amount )?due""", CI),
+        Regex("""\b(debited|credited|charged|withdrawn)\b""", CI),
+        Regex("""\bEMI\b""", CI),
+        Regex("""\brecharge\b""", CI),
+        Regex("""(rs\.?|inr|usd|eur|gbp|[₹$€£])\s?\d""", CI)
+    )
+
     /** Lines an app uses as a "new messages" rollup that carry no real body. */
     private val SUMMARY_NOISE: List<Regex> = listOf(
         Regex("""^\d+ new messages?$""", CI),
@@ -167,6 +205,24 @@ object PatternCatalog {
         if (t.isEmpty()) return true
         return SUMMARY_NOISE.any { it.containsMatchIn(t) }
     }
+
+    /**
+     * True if [text] reads as a one-time-passcode SMS: it has OTP context wording
+     * AND contains a code-shaped number. Both are required so a bare "your code: x"
+     * without digits, or a stray number without context, does not match.
+     */
+    fun isOtp(text: String): Boolean =
+        OTP_CONTEXT.any { it.containsMatchIn(text) } && OTP_CODE.containsMatchIn(text)
+
+    /** Extract the OTP code from [text] (digits only, hyphen/space stripped), or null. */
+    fun extractOtp(text: String): String? {
+        if (OTP_CONTEXT.none { it.containsMatchIn(text) }) return null
+        return OTP_CODE.find(text)?.value?.filter { it.isDigit() }
+    }
+
+    /** True if [text] reads as a finance / bill / payment SMS. */
+    fun isFinance(text: String): Boolean =
+        FINANCE_CONTEXT.any { it.containsMatchIn(text) }
 
     /**
      * Match an explicit `@handle` mention of any of [handles] inside [text].

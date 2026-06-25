@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,24 +20,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -50,6 +59,9 @@ import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusError
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.motionEnter
+import com.quietping.ui.theme.motionExit
+import com.quietping.ui.theme.motionScaleIn
 
 /**
  * Biometric app-lock gate (PRD §9.1, §11). Shown first when
@@ -88,7 +100,7 @@ fun AppLockScreen(
                 host.showBiometricPrompt(
                     onSuccess = { viewModel.onAuthSucceeded() },
                     onError = { msg -> viewModel.onAuthError(msg) },
-                    onFailed = { /* a single bad read; keep the prompt open */ }
+                    onFailed = { viewModel.onAuthFailed() } // logged as a break-in attempt
                 )
             }
         }
@@ -112,7 +124,9 @@ fun AppLockScreen(
         phase = uiState.phase,
         errorText = uiState.errorText,
         canAuthenticate = canAuthenticate,
-        onUnlock = showPrompt
+        decoyAvailable = uiState.decoyAvailable,
+        onUnlock = showPrompt,
+        onSubmitPin = viewModel::submitPin
     )
 }
 
@@ -121,7 +135,9 @@ private fun LockContent(
     phase: AuthPhase,
     errorText: String?,
     canAuthenticate: Boolean,
-    onUnlock: () -> Unit
+    decoyAvailable: Boolean,
+    onUnlock: () -> Unit,
+    onSubmitPin: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -136,19 +152,21 @@ private fun LockContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App-lock emblem.
-            Box(
-                modifier = Modifier
-                    .size(112.dp)
-                    .glass(cornerRadius = GlassDefaults.CornerRadiusFull),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Shield,
-                    contentDescription = null,
-                    tint = Emerald400,
-                    modifier = Modifier.size(48.dp)
-                )
+            // App-lock emblem (scales in on appearance for a calm reveal).
+            AnimatedVisibility(visible = true, enter = motionScaleIn()) {
+                Box(
+                    modifier = Modifier
+                        .size(112.dp)
+                        .glass(cornerRadius = GlassDefaults.CornerRadiusFull),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = null,
+                        tint = Emerald400,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.height(28.dp))
@@ -176,22 +194,28 @@ private fun LockContent(
                 modifier = Modifier.fillMaxWidth(0.95f)
             )
 
-            if (phase == AuthPhase.ERROR && errorText != null) {
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = StatusError,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = errorText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StatusError,
-                        textAlign = TextAlign.Center
-                    )
+            AnimatedVisibility(
+                visible = phase == AuthPhase.ERROR && errorText != null,
+                enter = motionEnter(),
+                exit = motionExit()
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = StatusError,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = errorText.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StatusError,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
@@ -202,6 +226,28 @@ private fun LockContent(
                     text = if (phase == AuthPhase.PROMPTING) "Waiting…" else "Unlock",
                     enabled = phase != AuthPhase.PROMPTING,
                     onClick = onUnlock
+                )
+            }
+
+            // Decoy PIN entry (privacy escape hatch). Shown only when a decoy PIN is
+            // configured; a correct entry opens an empty vault, not the real one.
+            if (decoyAvailable) {
+                Spacer(Modifier.height(20.dp))
+                var pin by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { if (it.length <= 12 && it.all(Char::isDigit)) pin = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Enter PIN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (pin.isNotEmpty()) { onSubmitPin(pin); pin = "" }
+                    })
                 )
             }
         }

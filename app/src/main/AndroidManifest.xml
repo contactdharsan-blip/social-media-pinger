@@ -14,6 +14,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Allow VIP / name conditions to bypass Do Not Disturb (PRD §8). -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- CRITICAL alert style: full-screen heads-up that wakes the screen (Bundle 1).
+         On Android 14+ this is user-grantable for non-call/alarm apps; harmless if denied. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Rebind the notification listener after reboot (PRD 6F). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Optional biometric app lock for the Vault (PRD §11). -->
@@ -55,6 +58,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.QuietPing" />
 
         <!-- App-icon switcher (PRD 6E): one alias per selectable icon. Exactly
@@ -129,6 +133,32 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!--
+          Face 2 — Xposed/LSPosed module metadata (FACE2_XPOSED_RD.md). Present on every
+          install but INERT unless the device is rooted with LSPosed AND the user enables the
+          module + scopes it. LSPosed reads these to load the hook into the target processes.
+          No INTERNET, no extra runtime lib: the Xposed API is compileOnly (provided by the
+          framework, never bundled). Scope is fixed to the chat-app packages only.
+        -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
+
+        <!--
+          Face 2 → Face 1 vault bridge sink (FACE2_XPOSED_RD.md §9). Receives a recovered
+          "delete for everyone" message from the Xposed hook running inside the target app's
+          process, via ContentProvider.call(). MUST be exported to accept a cross-UID call, but
+          the provider authenticates every delivery by KERNEL-ENFORCED caller UID
+          (Binder.getCallingUid must resolve to a target package) — no shared secret, no spoofing.
+          Still on-device — no INTERNET.
+        -->
+        <provider
+            android:name=".capture.DeepCaptureProvider"
+            android:authorities="com.quietping.deepcapture"
+            android:enabled="true"
+            android:exported="true" />
 
         <!-- Rebind capture after reboot (PRD 6F). -->
         <receiver

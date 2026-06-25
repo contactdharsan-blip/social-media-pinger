@@ -40,7 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.quietping.domain.model.AlertStyle
 import com.quietping.domain.model.AppPackage
+import com.quietping.domain.model.RuleAction
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
 import com.quietping.ui.components.GlassButton
@@ -54,6 +56,7 @@ import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextSecondary
+import com.quietping.ui.theme.animateSizeChange
 import com.quietping.ui.theme.TextTertiary
 
 /**
@@ -151,6 +154,7 @@ fun RuleEditorScreen(
 
         // --- Type-specific matcher ---
         item(key = "matcher") {
+          Column(modifier = Modifier.fillMaxWidth().animateSizeChange()) {
             when (draft.type) {
                 TriggerType.KEYWORD -> EditorSection(
                     title = "Keywords",
@@ -216,6 +220,7 @@ fun RuleEditorScreen(
                     }
                 }
             }
+          }
         }
 
         // --- Sound preset ---
@@ -234,6 +239,89 @@ fun RuleEditorScreen(
                             text = preset.displayName,
                             selected = draft.soundPreset == preset,
                             onClick = { viewModel.setSoundPreset(preset) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- Escalation style ---
+        item(key = "escalation") {
+            EditorSection(
+                title = "Escalation",
+                subtitle = draft.alertStyle.description()
+            ) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AlertStyle.entries.forEach { style ->
+                        SelectChip(
+                            text = style.label(),
+                            selected = draft.alertStyle == style,
+                            onClick = { viewModel.setAlertStyle(style) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- Action: alert vs block ---
+        item(key = "action") {
+            EditorSection(
+                title = "Action",
+                subtitle = draft.action.description()
+            ) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    RuleAction.entries.forEach { action ->
+                        SelectChip(
+                            text = action.label(),
+                            selected = draft.action == action,
+                            onClick = { viewModel.setAction(action) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- Active hours window ---
+        item(key = "hours") {
+            EditorSection(title = "Active hours", subtitle = "Only fire during a time window") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().animateSizeChange(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        SwitchRow(
+                            title = "Limit to a time window",
+                            subtitle = "Outside these hours the rule stays silent",
+                            checked = draft.windowEnabled,
+                            onCheckedChange = viewModel::setWindowEnabled
+                        )
+                    }
+                    if (draft.windowEnabled) {
+                        Text(
+                            text = "From",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextSecondary
+                        )
+                        HourChips(
+                            selectedMin = draft.windowStartMin,
+                            onSelect = viewModel::setWindowStart
+                        )
+                        Text(
+                            text = "Until",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextSecondary
+                        )
+                        HourChips(
+                            selectedMin = draft.windowEndMin,
+                            onSelect = viewModel::setWindowEnd
                         )
                     }
                 }
@@ -404,6 +492,55 @@ private fun SwitchRow(
             )
         )
     }
+}
+
+/** A curated set of hour chips for picking a window bound (minute-of-day). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HourChips(
+    selectedMin: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        WINDOW_HOUR_OPTIONS.forEach { hour ->
+            val min = hour * 60
+            SelectChip(
+                text = "%02d:00".format(hour),
+                selected = selectedMin == min,
+                onClick = { onSelect(min) }
+            )
+        }
+    }
+}
+
+/** Common boundary hours offered by the active-hours picker. */
+private val WINDOW_HOUR_OPTIONS = listOf(0, 6, 7, 8, 9, 12, 17, 18, 20, 21, 22, 23)
+
+private fun AlertStyle.label(): String = when (this) {
+    AlertStyle.STANDARD -> "Standard"
+    AlertStyle.PERSISTENT -> "Persistent"
+    AlertStyle.CRITICAL -> "Critical"
+}
+
+private fun AlertStyle.description(): String = when (this) {
+    AlertStyle.STANDARD -> "One heads-up alert."
+    AlertStyle.PERSISTENT -> "Keep re-pinging until you read it."
+    AlertStyle.CRITICAL -> "Full-screen alarm that pierces Do Not Disturb."
+}
+
+private fun RuleAction.label(): String = when (this) {
+    RuleAction.ALERT -> "Alert me"
+    RuleAction.SUPPRESS -> "Block (no alert)"
+}
+
+private fun RuleAction.description(): String = when (this) {
+    RuleAction.ALERT -> "Fire an alert when this rule matches."
+    RuleAction.SUPPRESS -> "Silently archive matches — never alert (keyword block)."
 }
 
 /** Shared field colors for the editor's text inputs. */

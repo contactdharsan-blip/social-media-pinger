@@ -32,6 +32,11 @@ sealed interface Dest {
         override val route: String = "vault"
     }
 
+    /** Captured-media gallery: a flat grid of files held in the on-device media vault. */
+    data object VaultMedia : Dest {
+        override val route: String = "vault_media"
+    }
+
     /** A single Vault conversation thread, keyed by [ARG_CONVERSATION_ID]. */
     data object VaultThread : Dest {
         const val ARG_CONVERSATION_ID: String = "conversationId"
@@ -79,6 +84,11 @@ sealed interface Dest {
     /** Privacy & lock settings: biometric lock, retention window, purge now. */
     data object PrivacyLock : Dest {
         override val route: String = "privacy_lock"
+    }
+
+    /** Deep capture (root/LSPosed): per-app in-process hook toggles. */
+    data object DeepCapture : Dest {
+        override val route: String = "deep_capture"
     }
 
     companion object {

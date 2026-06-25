@@ -72,4 +72,19 @@ sealed interface RawEvent {
         val text: String,
         val postedAt: Long
     ) : RawEvent
+
+    /**
+     * A "delete for everyone" message recovered by the Face 2 Xposed hook from inside the
+     * target app's process (FACE2_XPOSED_RD.md). Delivered cross-process via the token-gated
+     * [com.quietping.capture.DeepCaptureProvider], then ingested through the normal vault path
+     * so the recovered content is archived (and can still match rules). [conversationKey] is the
+     * hook's stable per-thread key; [sender] / [body] are the recovered original message.
+     */
+    data class DeepHookRecovered(
+        val packageName: String,
+        val conversationKey: String,
+        val sender: String,
+        val body: String,
+        val postedAt: Long
+    ) : RawEvent
 }

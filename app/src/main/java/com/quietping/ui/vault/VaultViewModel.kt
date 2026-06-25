@@ -5,12 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.quietping.domain.model.Conversation
 import com.quietping.domain.model.Message
 import com.quietping.domain.repo.MessageRepository
+import com.quietping.domain.security.DecoyMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -69,6 +71,18 @@ class VaultViewModel @Inject constructor(
         query.value = ""
     }
 
+    /**
+     * Toggle whether a group conversation is watched for alerts. Muting a group keeps
+     * archiving its messages but stops them reaching the RuleEngine (the per-group mute
+     * gate in CapturePipeline). The change persists via [MessageRepository.setWatched]
+     * and re-emits through the conversations Flow that drives this screen.
+     */
+    fun setWatched(conversationId: Long, watched: Boolean) {
+        viewModelScope.launch {
+            messageRepository.setWatched(conversationId, watched)
+        }
+    }
+
     private fun buildState(
         conversations: List<Conversation>,
         deleted: List<Message>,
@@ -76,6 +90,11 @@ class VaultViewModel @Inject constructor(
         activeFilter: VaultFilter,
         activeQuery: String
     ): VaultUiState {
+        // Decoy session (unlocked with the decoy PIN): reveal an empty vault.
+        if (DecoyMode.isActive) {
+            return VaultUiState(filter = activeFilter, query = activeQuery, isLoading = false)
+        }
+
         val deletedByConv = deleted.groupBy { it.conversationId }
         val editedByConv = edited.groupBy { it.conversationId }
 

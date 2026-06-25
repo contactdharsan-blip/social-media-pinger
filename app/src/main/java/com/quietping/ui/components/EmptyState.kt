@@ -1,5 +1,6 @@
 package com.quietping.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -20,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.motionScaleIn
 
 /**
  * The empty-state for any list/feed that has no content yet (DESIGN.md feedback
@@ -41,6 +48,8 @@ fun EmptyState(
     action: (@Composable () -> Unit)? = null
 ) {
     val accent = LocalQuietPingTheme.current.accent
+    var iconVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { iconVisible = true }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -48,18 +57,20 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(accent.copy(alpha = 0.10f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(34.dp)
-            )
+        AnimatedVisibility(visible = iconVisible, enter = motionScaleIn()) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(accent.copy(alpha = 0.10f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
         }
         Text(
             text = title,

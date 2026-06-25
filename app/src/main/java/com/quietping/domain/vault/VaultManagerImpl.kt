@@ -36,11 +36,10 @@ class VaultManagerImpl(
     private val messageRepository: MessageRepository
 ) : VaultManager {
 
-    override suspend fun ingest(message: Message) {
+    override suspend fun ingest(message: Message): Long {
         // Unresolved conversation: the store owns resolution + dedupe/version.
         if (message.conversationId <= 0L) {
-            messageRepository.upsert(message)
-            return
+            return messageRepository.upsert(message)
         }
 
         val conversation = messageRepository.conversations().first()
@@ -48,8 +47,7 @@ class VaultManagerImpl(
         // Without the conversation row we cannot derive a stable key; let the store
         // resolve + dedupe instead of guessing.
         if (conversation == null) {
-            messageRepository.upsert(message)
-            return
+            return messageRepository.upsert(message)
         }
 
         val incomingEditKey = StableKey.editKey(
@@ -76,7 +74,7 @@ class VaultManagerImpl(
             ) == incomingEditKey
         }
 
-        when {
+        return when {
             match == null -> {
                 // Genuinely new message in a known conversation.
                 messageRepository.upsert(message)
@@ -89,7 +87,9 @@ class VaultManagerImpl(
                 postedAt = match.postedAt,
                 body = match.currentBody
             ) == incomingContentKey -> {
-                // Exact duplicate re-delivery (same content key): nothing to do.
+                // Exact duplicate re-delivery (same content key): nothing to store;
+                // return the existing row's id so the caller still has a real id.
+                match.id
             }
 
             isWithinEditWindow(match, message) -> {

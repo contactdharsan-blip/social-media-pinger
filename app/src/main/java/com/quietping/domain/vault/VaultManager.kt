@@ -13,8 +13,12 @@ interface VaultManager {
     /**
      * Persist [message]: insert if new, or append a [com.quietping.domain.model.MessageVersion]
      * and mark EDITED if the same logical message reappears with a changed body.
+     *
+     * @return the row id of the stored message (the existing row's id on a
+     *   dedupe/edit, or the newly inserted row's id), so callers can attach the
+     *   real id to the message before rule matching / alert dispatch.
      */
-    suspend fun ingest(message: Message)
+    suspend fun ingest(message: Message): Long
 
     /**
      * Mark the cached message identified by [conversationKey] + [appPackage] (and

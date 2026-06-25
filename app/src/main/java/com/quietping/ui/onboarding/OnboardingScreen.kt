@@ -63,6 +63,8 @@ import com.quietping.ui.theme.StatusSuccess
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.motionEnter
+import com.quietping.ui.theme.motionExit
 
 /**
  * Stepped permission onboarding (PRD §7 / §9.1). Each step explains *why* the
@@ -249,9 +251,15 @@ private fun StepBody(
             modifier = Modifier.fillMaxWidth(0.92f)
         )
 
-        if (granted) {
-            Spacer(Modifier.height(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = granted,
+            enter = motionEnter(),
+            exit = motionExit()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 20.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,

@@ -7,6 +7,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,7 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -56,8 +57,12 @@ import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.BgTertiary
 import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
+import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.StatusAlert
+import com.quietping.ui.theme.animateSizeChange
+import com.quietping.ui.theme.cascadeItem
+import com.quietping.ui.theme.riseIn
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 import com.quietping.ui.theme.glass
@@ -86,13 +91,15 @@ fun AlertSettingsScreen(
     ) {
         item {
             SettingsScreenHeader(
+                modifier = Modifier.riseIn(0),
                 title = "Alert settings",
                 subtitle = "A separate notification channel per condition — its own " +
                     "sound, vibration, and Do Not Disturb behavior."
             )
         }
-        items(state.configs, key = { it.triggerType.name }) { config ->
+        itemsIndexed(state.configs, key = { _, config -> config.triggerType.name }) { index, config ->
             AlertConditionCard(
+                modifier = cascadeItem(index),
                 config = config,
                 onSelectPreset = { preset ->
                     viewModel.setSoundPreset(config.triggerType, preset)
@@ -108,8 +115,116 @@ fun AlertSettingsScreen(
                 onPreview = { player.preview(context, config.soundPreset) }
             )
         }
+
+        item(key = "digest") {
+            DigestCard(
+                digestEnabled = state.alerts.digestEnabled,
+                digestHour = state.alerts.digestHour,
+                onToggleDigest = viewModel::setDigestEnabled,
+                onSelectHour = viewModel::setDigestHour
+            )
+        }
+
+        item(key = "otp") {
+            OtpCleanupCard(
+                hours = state.alerts.otpAutoDeleteHours,
+                onSelectHours = viewModel::setOtpAutoDeleteHours
+            )
+        }
     }
 }
+
+/** Daily digest toggle + delivery-hour picker. */
+@Composable
+private fun DigestCard(
+    digestEnabled: Boolean,
+    digestHour: Int,
+    onToggleDigest: (Boolean) -> Unit,
+    onSelectHour: (Int) -> Unit
+) {
+    SettingsGlassCard(modifier = Modifier.animateSizeChange()) {
+        SectionLabel("Daily digest")
+        Spacer(Modifier.height(8.dp))
+        ToggleRow(
+            icon = Icons.Filled.NotificationsActive,
+            title = "Summarize low-priority matches",
+            subtitle = "One quiet summary a day instead of many pings",
+            trailing = { GlassSwitch(checked = digestEnabled, onCheckedChange = onToggleDigest) }
+        )
+        AnimatedVisibility(visible = digestEnabled) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Deliver at",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(8.dp))
+                PrefChipRow(
+                    options = DIGEST_HOURS.map { it to "%02d:00".format(it) },
+                    selected = digestHour,
+                    onSelect = onSelectHour
+                )
+            }
+        }
+    }
+}
+
+/** OTP auto-delete window picker. */
+@Composable
+private fun OtpCleanupCard(hours: Int, onSelectHours: (Int) -> Unit) {
+    SettingsGlassCard(modifier = Modifier.animateSizeChange()) {
+        SectionLabel("OTP auto-delete")
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Captured one-time passcodes (SMS) are deleted after this window. " +
+                "Off keeps them under the normal retention limit.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextTertiary
+        )
+        Spacer(Modifier.height(12.dp))
+        PrefChipRow(
+            options = OTP_HOUR_OPTIONS.map { it to otpLabel(it) },
+            selected = hours,
+            onSelect = onSelectHours
+        )
+    }
+}
+
+/** A wrapping row of selectable value chips. */
+@Composable
+private fun PrefChipRow(
+    options: List<Pair<Int, String>>,
+    selected: Int,
+    onSelect: (Int) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { (value, label) ->
+            val isSel = value == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
+                    .background(if (isSel) Emerald400 else BgTertiary.copy(alpha = 0.6f))
+                    .clickable { onSelect(value) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSel) OnAccent else TextSecondary,
+                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+private val DIGEST_HOURS = listOf(7, 9, 12, 18, 21)
+private val OTP_HOUR_OPTIONS = listOf(0, 6, 12, 24, 48)
+
+private fun otpLabel(hours: Int): String = if (hours == 0) "Off" else "${hours}h"
 
 /** A glass card for a single condition with its alert controls. */
 @Composable
@@ -118,9 +233,10 @@ private fun AlertConditionCard(
     onSelectPreset: (SoundPreset) -> Unit,
     onToggleVibrate: (Boolean) -> Unit,
     onToggleDnd: (Boolean) -> Unit,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    SettingsGlassCard {
+    SettingsGlassCard(modifier = modifier.animateSizeChange()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -251,8 +367,16 @@ private fun PresetChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f)
-    val fg = if (selected) OnAccent else TextSecondary
+    val bg by animateColorAsState(
+        targetValue = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f),
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "presetChipBg"
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) OnAccent else TextSecondary,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "presetChipFg"
+    )
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
@@ -352,8 +476,12 @@ private fun vibratePreview(context: Context) {
 // --- Shared small UI primitives (kept local to the settings screens) ---
 
 @Composable
-internal fun SettingsScreenHeader(title: String, subtitle: String? = null) {
-    Column {
+internal fun SettingsScreenHeader(
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,

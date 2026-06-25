@@ -21,12 +21,35 @@ data class ThemeSettings(
 /**
  * Privacy controls for the Vault and app lock.
  *
- * @param biometricLock require biometric auth on launch.
- * @param retentionDays auto-purge captured messages older than this many days.
+ * @param biometricLock          require biometric auth on launch.
+ * @param retentionDays          auto-purge captured messages older than this many days.
+ * @param screenshotBlock        set FLAG_SECURE app-wide (blocks screenshots / screen recording).
+ * @param hideNotificationContent post alerts with a generic title/body + secret lock-screen visibility.
+ * @param breakInLogEnabled      record failed unlock attempts to the on-device break-in log.
+ * @param decoyPinEnabled        a secondary "decoy" PIN unlocks into an empty vault.
+ * @param decoyPinHash           salted hash of the decoy PIN (never the raw PIN); "" when unset.
  */
 data class PrivacySettings(
     val biometricLock: Boolean = false,
-    val retentionDays: Int = 30
+    val retentionDays: Int = 30,
+    val screenshotBlock: Boolean = false,
+    val hideNotificationContent: Boolean = false,
+    val breakInLogEnabled: Boolean = false,
+    val decoyPinEnabled: Boolean = false,
+    val decoyPinHash: String = ""
+)
+
+/**
+ * Alert-delivery preferences not tied to a single rule.
+ *
+ * @param digestEnabled       batch low-priority matches into a once-daily summary.
+ * @param digestHour          hour-of-day (0..23) the digest is delivered.
+ * @param otpAutoDeleteHours  auto-purge captured OTP SMS after this many hours (0 ⇒ off).
+ */
+data class AlertPrefs(
+    val digestEnabled: Boolean = false,
+    val digestHour: Int = 9,
+    val otpAutoDeleteHours: Int = 0
 )
 
 /**
@@ -41,6 +64,9 @@ interface SettingsRepository {
     /** Privacy/lock settings. */
     val privacy: Flow<PrivacySettings>
 
+    /** Alert-delivery preferences (digest, OTP auto-delete). */
+    val alerts: Flow<AlertPrefs>
+
     /** The currently active app-icon alias (see [com.quietping.domain.icon.IconSwitcher]). */
     val activeIconAlias: Flow<String>
 
@@ -49,6 +75,9 @@ interface SettingsRepository {
 
     /** Persist new privacy settings. */
     suspend fun setPrivacy(p: PrivacySettings)
+
+    /** Persist new alert-delivery preferences. */
+    suspend fun setAlerts(a: AlertPrefs)
 
     /** Persist the active icon alias. */
     suspend fun setActiveIconAlias(alias: String)

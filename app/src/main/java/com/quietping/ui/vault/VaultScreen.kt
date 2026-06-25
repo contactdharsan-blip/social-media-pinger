@@ -1,5 +1,6 @@
 package com.quietping.ui.vault
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +27,10 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.ThumbUp
@@ -58,11 +62,13 @@ import com.quietping.ui.components.SegmentedControl
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.StatusAlert
 import com.quietping.ui.theme.StatusWarning
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.animatedItem
 import com.quietping.ui.theme.glass
 
 /**
@@ -96,7 +102,9 @@ fun VaultScreen(
         onFilterChange = viewModel::setFilter,
         onQueryChange = viewModel::setQuery,
         onClearQuery = viewModel::clearQuery,
-        onOpenThread = onOpenThread
+        onOpenThread = onOpenThread,
+        onSetWatched = viewModel::setWatched,
+        onOpenMedia = { onNavigate(Dest.VaultMedia) }
     )
 }
 
@@ -106,7 +114,9 @@ private fun VaultContent(
     onFilterChange: (VaultFilter) -> Unit,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
-    onOpenThread: (Long) -> Unit
+    onOpenThread: (Long) -> Unit,
+    onSetWatched: (Long, Boolean) -> Unit,
+    onOpenMedia: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -123,7 +133,17 @@ private fun VaultContent(
         ) {
             SectionHeader(
                 title = "Message Vault",
-                subtitle = "Recovered and edited messages, on-device only"
+                subtitle = "Recovered and edited messages, on-device only",
+                trailing = {
+                    val accent = LocalQuietPingTheme.current.accent
+                    IconButton(onClick = onOpenMedia) {
+                        Icon(
+                            imageVector = Icons.Filled.PhotoLibrary,
+                            contentDescription = "Captured media gallery",
+                            tint = accent
+                        )
+                    }
+                }
             )
 
             val filters = VaultFilter.entries
@@ -141,16 +161,31 @@ private fun VaultContent(
             )
         }
 
-        when {
-            uiState.isLoading -> VaultLoading()
-            uiState.isEmpty -> VaultEmpty(uiState)
-            else -> ConversationList(
-                conversations = uiState.conversations,
-                onOpenThread = onOpenThread
-            )
+        val bodyState = when {
+            uiState.isLoading -> VaultBodyState.LOADING
+            uiState.isEmpty -> VaultBodyState.EMPTY
+            else -> VaultBodyState.CONTENT
+        }
+        Crossfade(
+            targetState = bodyState,
+            animationSpec = MotionTokens.signatureSpring(),
+            label = "vaultBody"
+        ) { state ->
+            when (state) {
+                VaultBodyState.LOADING -> VaultLoading()
+                VaultBodyState.EMPTY -> VaultEmpty(uiState)
+                VaultBodyState.CONTENT -> ConversationList(
+                    conversations = uiState.conversations,
+                    onOpenThread = onOpenThread,
+                    onSetWatched = onSetWatched
+                )
+            }
         }
     }
 }
+
+/** The three mutually exclusive body states the Vault list crossfades between. */
+private enum class VaultBodyState { LOADING, EMPTY, CONTENT }
 
 /** A frosted-glass search input (DESIGN.md §7.5) with a leading magnifier + clear. */
 @Composable
@@ -213,7 +248,8 @@ private fun VaultSearchField(
 @Composable
 private fun ConversationList(
     conversations: List<ConversationSummary>,
-    onOpenThread: (Long) -> Unit
+    onOpenThread: (Long) -> Unit,
+    onSetWatched: (Long, Boolean) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -223,7 +259,9 @@ private fun ConversationList(
         items(items = conversations, key = { it.id }) { summary ->
             ConversationRow(
                 summary = summary,
-                onClick = { onOpenThread(summary.id) }
+                onClick = { onOpenThread(summary.id) },
+                onSetWatched = onSetWatched,
+                modifier = animatedItem()
             )
         }
     }
@@ -233,13 +271,17 @@ private fun ConversationList(
 @Composable
 private fun ConversationRow(
     summary: ConversationSummary,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onSetWatched: (Long, Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val accent = LocalQuietPingTheme.current.accent
     GlassCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        contentPadding = PaddingValues(14.dp)
+        contentPadding = PaddingValues(14.dp),
+        glow = true,
+        sheen = true
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -283,6 +325,15 @@ private fun ConversationRow(
                         color = TextTertiary,
                         maxLines = 1
                     )
+                    // Per-group watch toggle: only groups can be muted (1:1 chats always
+                    // evaluate). Muting keeps archiving but stops alerts for this group.
+                    if (summary.isGroup) {
+                        WatchToggle(
+                            watched = summary.watched,
+                            displayName = summary.displayName,
+                            onToggle = { onSetWatched(summary.id, !summary.watched) }
+                        )
+                    }
                 }
                 Text(
                     text = summary.lastMessageBody.ifBlank { "No recovered preview" },
@@ -312,6 +363,35 @@ private fun ConversationRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * Compact bell toggle for a group row. Filled bell (accent) = watched/alerting; struck
+ * bell (tertiary) = muted. Sits inside the clickable card but handles its own taps, so
+ * tapping the bell mutes/unmutes without opening the thread.
+ */
+@Composable
+private fun WatchToggle(
+    watched: Boolean,
+    displayName: String,
+    onToggle: () -> Unit
+) {
+    val accent = LocalQuietPingTheme.current.accent
+    IconButton(
+        onClick = onToggle,
+        modifier = Modifier.size(32.dp)
+    ) {
+        Icon(
+            imageVector = if (watched) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
+            contentDescription = if (watched) {
+                "Watching \"$displayName\" — tap to mute alerts"
+            } else {
+                "\"$displayName\" muted — tap to watch for alerts"
+            },
+            tint = if (watched) accent else TextTertiary,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

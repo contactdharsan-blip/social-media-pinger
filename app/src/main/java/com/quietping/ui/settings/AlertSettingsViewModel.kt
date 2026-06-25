@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
 import com.quietping.domain.repo.RuleRepository
+import com.quietping.domain.settings.AlertPrefs
+import com.quietping.domain.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -74,9 +76,10 @@ data class AlertConfig(
     val isPending: Boolean get() = ruleCount == 0
 }
 
-/** UI state: one [AlertConfig] per trigger type, in canonical order. */
+/** UI state: one [AlertConfig] per trigger type, plus the global alert prefs. */
 data class AlertSettingsUiState(
-    val configs: List<AlertConfig> = emptyList()
+    val configs: List<AlertConfig> = emptyList(),
+    val alerts: AlertPrefs = AlertPrefs()
 )
 
 /**
@@ -90,14 +93,15 @@ data class AlertSettingsUiState(
  */
 @HiltViewModel
 class AlertSettingsViewModel @Inject constructor(
-    private val ruleRepository: RuleRepository
+    private val ruleRepository: RuleRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     /** User edits not (yet) reflected by the reactive rule stream. */
     private val overrides = MutableStateFlow<Map<TriggerType, AlertConfig>>(emptyMap())
 
     val uiState: StateFlow<AlertSettingsUiState> =
-        combine(ruleRepository.rules(), overrides) { rules, edits ->
+        combine(ruleRepository.rules(), overrides, settingsRepository.alerts) { rules, edits, alerts ->
             val byType = rules.groupBy { it.type }
             val configs = TriggerType.entries.map { type ->
                 val baseline = baselineFor(type, byType[type].orEmpty().let { ofType ->
@@ -112,7 +116,7 @@ class AlertSettingsViewModel @Inject constructor(
                 // An override wins only until the rule stream confirms the same value.
                 edits[type]?.copy(ruleCount = baseline.ruleCount) ?: baseline
             }
-            AlertSettingsUiState(configs = configs)
+            AlertSettingsUiState(configs = configs, alerts = alerts)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -150,6 +154,21 @@ class AlertSettingsViewModel @Inject constructor(
      */
     fun setVibrate(type: TriggerType, enabled: Boolean) {
         record(type) { it.copy(vibrate = enabled) }
+    }
+
+    /** Toggle the once-daily digest of low-priority matches. */
+    fun setDigestEnabled(enabled: Boolean) = updateAlerts { it.copy(digestEnabled = enabled) }
+
+    /** Set the digest delivery hour (0..23). */
+    fun setDigestHour(hour: Int) = updateAlerts { it.copy(digestHour = hour.coerceIn(0, 23)) }
+
+    /** Set the OTP auto-delete window in hours (0 ⇒ off). */
+    fun setOtpAutoDeleteHours(hours: Int) = updateAlerts { it.copy(otpAutoDeleteHours = hours.coerceAtLeast(0)) }
+
+    private inline fun updateAlerts(crossinline transform: (AlertPrefs) -> AlertPrefs) {
+        viewModelScope.launch {
+            settingsRepository.setAlerts(transform(uiState.value.alerts))
+        }
     }
 
     /** Merge an edit into the in-memory override map. */

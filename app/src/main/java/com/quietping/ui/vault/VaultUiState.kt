@@ -43,6 +43,9 @@ data class ConversationSummary(
     val displayName: String get() = conversation.displayName
     val isGroup: Boolean get() = conversation.isGroup
 
+    /** Whether this group is watched for alerts (only meaningful when [isGroup]). */
+    val watched: Boolean get() = conversation.watched
+
     /** True when this conversation has any recovered (deleted) content. */
     val hasDeleted: Boolean get() = deletedCount > 0
 

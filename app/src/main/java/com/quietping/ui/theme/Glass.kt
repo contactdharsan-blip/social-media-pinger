@@ -97,4 +97,10 @@ object MotionTokens {
 
     /** Float-typed signature spring (alpha/scale convenience). */
     val floatSpring: AnimationSpec<Float> = signatureSpring()
+
+    /** Scale a bottom-tab icon grows to when its tab is selected (nav consumes via graphicsLayer). */
+    val TabIconScaleSelected = 1.12f
+
+    /** Upward lift a selected bottom-tab icon translates by (nav consumes via graphicsLayer). */
+    val TabIconLift = 2.dp
 }

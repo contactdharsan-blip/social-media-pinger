@@ -53,6 +53,17 @@ class RuleEngineImplTest {
     }
 
     @Test
+    fun `keyword rule pings regardless of caps`() {
+        val rules = listOf(rule(TriggerType.KEYWORD, "hello"))
+        // lowercase pattern vs shouting body
+        assertThat(engine.evaluate(message("HELLO there"), rules)).hasSize(1)
+        assertThat(engine.evaluate(message("Hello there"), rules)).hasSize(1)
+        // uppercase pattern vs lowercase body
+        val shoutRule = listOf(rule(TriggerType.KEYWORD, "URGENT"))
+        assertThat(engine.evaluate(message("this is urgent"), shoutRule)).hasSize(1)
+    }
+
+    @Test
     fun `keyword rule does not match across word boundary`() {
         val rules = listOf(rule(TriggerType.KEYWORD, "cat"))
         assertThat(engine.evaluate(message("concatenate the list"), rules)).isEmpty()

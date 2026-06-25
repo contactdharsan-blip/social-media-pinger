@@ -1,5 +1,7 @@
 package com.quietping.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,11 +50,14 @@ import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.BgTertiary
 import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
+import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.QuietPingTheme
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.motionExit
+import com.quietping.ui.theme.motionScaleIn
 import com.quietping.ui.theme.parseHexColor
 
 /**
@@ -263,6 +268,16 @@ private fun AccentSwatch(
     modifier: Modifier = Modifier
 ) {
     val color = parseHexColor(preset.hex, fallback = Emerald400)
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 2.dp else 0.dp,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "accentBorderWidth"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) Color.White else Color.Transparent,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "accentBorderColor"
+    )
     Column(
         modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -275,13 +290,17 @@ private fun AccentSwatch(
                 .clip(CircleShape)
                 .background(color)
                 .border(
-                    width = if (selected) 2.dp else 0.dp,
-                    color = if (selected) Color.White else Color.Transparent,
+                    width = borderWidth,
+                    color = borderColor,
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (selected) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selected,
+                enter = motionScaleIn(),
+                exit = motionExit()
+            ) {
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "Selected",
@@ -365,7 +384,16 @@ private fun IconChoice(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderColor = if (selected) Emerald400 else com.quietping.ui.theme.CardBorder
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) Emerald400 else com.quietping.ui.theme.CardBorder,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "iconBorderColor"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 2.dp else 1.dp,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "iconBorderWidth"
+    )
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
@@ -381,7 +409,7 @@ private fun IconChoice(
                 .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
                 .background(BgTertiary)
                 .border(
-                    width = if (selected) 2.dp else 1.dp,
+                    width = borderWidth,
                     color = borderColor,
                     shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg)
                 ),
@@ -393,10 +421,14 @@ private fun IconChoice(
                 tint = Color.Unspecified,
                 modifier = Modifier.size(40.dp)
             )
-            if (selected) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selected,
+                enter = motionScaleIn(),
+                exit = motionExit(),
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .size(20.dp)
                         .clip(CircleShape)

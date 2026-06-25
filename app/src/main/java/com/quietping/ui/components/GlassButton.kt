@@ -1,12 +1,8 @@
 package com.quietping.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -21,20 +17,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
-import com.quietping.ui.theme.MotionTokens
+import com.quietping.ui.theme.Motion
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.pressElevation
 
 /** Visual style of a [GlassButton]. */
 enum class GlassButtonStyle {
@@ -51,9 +46,10 @@ enum class GlassButtonStyle {
 /**
  * The button vocabulary for the Dark Liquid-Glass system (DESIGN.md §7.3).
  *
- * All variants share the springy press (scale 0.96 on press, honoring the global
- * motion gate) and a ≥48.dp touch target. [Primary] uses a gradient accent fill,
- * [Secondary] a frosted glass surface, [Ghost] is text-only.
+ * All variants share the premium press — a spring scale-down to [Motion.PressScaleButton] plus an
+ * accent-tinted lift shadow, via the shared [pressElevation] (the same press language as [GlassCard] /
+ * [ListRow], honoring the global motion gate) — and a ≥48.dp touch target. [Primary] uses a gradient
+ * accent fill, [Secondary] a frosted glass surface, [Ghost] is text-only.
  *
  * @param text     button label.
  * @param onClick  click handler (ignored when [enabled] is false).
@@ -73,12 +69,6 @@ fun GlassButton(
 ) {
     val theme = LocalQuietPingTheme.current
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed && theme.motionEnabled && enabled) 0.96f else 1f,
-        animationSpec = MotionTokens.floatSpring,
-        label = "glassButtonPressScale"
-    )
 
     val shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg)
     val contentColor = when (style) {
@@ -89,11 +79,9 @@ fun GlassButton(
     val alpha = if (enabled) 1f else 0.45f
 
     val styled = modifier
-        .graphicsLayer {
-            scaleX = pressScale
-            scaleY = pressScale
-            this.alpha = alpha
-        }
+        // Shared press: scale + accent lift shadow (rests when disabled — no press events reach it).
+        .pressElevation(interaction, shape, pressedScale = Motion.PressScaleButton)
+        .graphicsLayer { this.alpha = alpha }
         .clip(shape)
         .then(
             when (style) {
@@ -107,10 +95,8 @@ fun GlassButton(
                 GlassButtonStyle.Secondary -> Modifier
                     .glass(intensity = theme.glassIntensity, cornerRadius = GlassDefaults.CornerRadiusLg)
 
-                GlassButtonStyle.Ghost -> Modifier.border(
-                    BorderStroke(1.dp, Color.Transparent),
-                    shape
-                )
+                // Ghost is borderless text-only — no fill, no border.
+                GlassButtonStyle.Ghost -> Modifier
             }
         )
         .clickable(

@@ -1,5 +1,6 @@
 package com.quietping.ui.rules
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,9 @@ import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusError
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.animateSizeChange
+import com.quietping.ui.theme.motionEnter
+import com.quietping.ui.theme.motionExit
 
 /**
  * Manage the starred contacts (handles) that fire a VIP rule for the current app.
@@ -98,13 +102,23 @@ fun VipPicker(
             )
         )
 
-        if (vips.isEmpty()) {
-            Text(
-                text = "No VIP contacts yet. Add the people whose messages should always ping.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary
-            )
-        } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateSizeChange(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AnimatedVisibility(
+                visible = vips.isEmpty(),
+                enter = motionEnter(),
+                exit = motionExit()
+            ) {
+                Text(
+                    text = "No VIP contacts yet. Add the people whose messages should always ping.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextTertiary
+                )
+            }
             vips.forEach { vip ->
                 VipRow(vip = vip, onRemove = { onRemove(vip.id) })
             }

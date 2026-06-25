@@ -74,10 +74,12 @@ object DomainProvidersModule {
     @Singleton
     fun provideAlertDispatcher(
         @ApplicationContext context: Context,
-        matchRepository: MatchRepository
+        matchRepository: MatchRepository,
+        settingsRepository: com.quietping.domain.settings.SettingsRepository
     ): AlertDispatcher = AlertDispatcherImpl(
         context = context,
-        matchRepository = matchRepository
+        matchRepository = matchRepository,
+        settingsRepository = settingsRepository
     )
 
     // ---- Message parsers contributed into the Set<MessageParser> ----

@@ -46,4 +46,8 @@ interface ConversationDao {
 
     @Query("UPDATE conversations SET display_name = :displayName, is_group = :isGroup WHERE id = :id")
     suspend fun updateMeta(id: Long, displayName: String, isGroup: Boolean)
+
+    /** Toggle the per-group alert watch flag. Leaves all other columns untouched. */
+    @Query("UPDATE conversations SET watched = :watched WHERE id = :id")
+    suspend fun setWatched(id: Long, watched: Boolean)
 }

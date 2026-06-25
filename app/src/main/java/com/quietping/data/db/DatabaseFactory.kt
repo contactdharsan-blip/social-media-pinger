@@ -45,6 +45,9 @@ object DatabaseFactory {
         )
             .openHelperFactory(factory)
             .addCallback(ForeignKeysCallback)
+            // Captured content is ephemeral (retention-purged); on a schema bump we
+            // drop and recreate rather than hand-write SQLCipher ALTER migrations.
+            .fallbackToDestructiveMigration()
             .build()
     }
 

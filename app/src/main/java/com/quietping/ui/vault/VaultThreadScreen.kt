@@ -73,7 +73,10 @@ import com.quietping.ui.theme.StatusWarning
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.animatedItem
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.sheen
+import com.quietping.ui.theme.travelingGlowBorder
 import java.text.DateFormat
 import java.util.Date
 
@@ -179,10 +182,11 @@ private fun ThreadList(messages: List<Message>) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(items = messages, key = { it.id }) { message ->
+            val itemModifier = animatedItem()
             when (message.status) {
-                MessageStatus.DELETED -> DeletedMessageCard(message)
-                MessageStatus.EDITED -> EditedMessageCard(message)
-                MessageStatus.ACTIVE -> ActiveMessageCard(message)
+                MessageStatus.DELETED -> DeletedMessageCard(message, itemModifier)
+                MessageStatus.EDITED -> EditedMessageCard(message, itemModifier)
+                MessageStatus.ACTIVE -> ActiveMessageCard(message, itemModifier)
             }
         }
     }
@@ -190,8 +194,8 @@ private fun ThreadList(messages: List<Message>) {
 
 /** A normal captured message. */
 @Composable
-private fun ActiveMessageCard(message: Message) {
-    GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
+private fun ActiveMessageCard(message: Message, modifier: Modifier = Modifier) {
+    GlassCard(modifier = modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
         MessageMeta(sender = message.sender, timestamp = message.postedAt)
         Spacer(Modifier.height(6.dp))
         Text(
@@ -207,7 +211,7 @@ private fun ActiveMessageCard(message: Message) {
  * full version history with a per-step word diff. Honors the motion gate.
  */
 @Composable
-private fun EditedMessageCard(message: Message) {
+private fun EditedMessageCard(message: Message, modifier: Modifier = Modifier) {
     val motionEnabled = LocalQuietPingTheme.current.motionEnabled
     var expanded by remember(message.id) { mutableStateOf(false) }
     val hasHistory = message.versions.size > 1
@@ -219,9 +223,12 @@ private fun EditedMessageCard(message: Message) {
     )
 
     GlassCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         onClick = if (hasHistory) ({ expanded = !expanded }) else null,
-        contentPadding = PaddingValues(14.dp)
+        contentPadding = PaddingValues(14.dp),
+        glow = true,
+        sheen = true,
+        glowColors = listOf(StatusWarning)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -371,13 +378,18 @@ private fun VersionRow(
  * original body shown struck through (PRD §6D — surfaced before it was deleted).
  */
 @Composable
-private fun DeletedMessageCard(message: Message) {
+private fun DeletedMessageCard(message: Message, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(GlassDefaults.CornerRadius))
             .glass(intensity = LocalQuietPingTheme.current.glassIntensity, cornerRadius = GlassDefaults.CornerRadius)
             .background(StatusAlert.copy(alpha = 0.06f), RoundedCornerShape(GlassDefaults.CornerRadius))
+            .sheen()
+            .travelingGlowBorder(
+                cornerRadius = GlassDefaults.CornerRadius,
+                colors = listOf(StatusAlert)
+            )
             .padding(14.dp)
     ) {
         Column {

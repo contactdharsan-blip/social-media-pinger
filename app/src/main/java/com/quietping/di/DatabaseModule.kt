@@ -3,6 +3,7 @@ package com.quietping.di
 import android.content.Context
 import com.quietping.data.db.AppDatabase
 import com.quietping.data.db.DatabaseFactory
+import com.quietping.data.db.dao.BreakInLogDao
 import com.quietping.data.db.dao.ConversationDao
 import com.quietping.data.db.dao.MatchDao
 import com.quietping.data.db.dao.MessageDao
@@ -56,4 +57,7 @@ object DatabaseModule {
 
     @Provides
     fun provideMatchDao(db: AppDatabase): MatchDao = db.matchDao()
+
+    @Provides
+    fun provideBreakInLogDao(db: AppDatabase): BreakInLogDao = db.breakInLogDao()
 }

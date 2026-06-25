@@ -17,6 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Xposed API (de.robv.android.xposed:api) — compileOnly, not redistributed in the APK.
+        maven { url = uri("https://api.xposed.info/") }
     }
 }
 

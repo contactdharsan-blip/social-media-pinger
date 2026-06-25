@@ -1,8 +1,6 @@
 package com.quietping.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -53,7 +51,11 @@ import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.NeutralGray
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
+import com.quietping.ui.theme.cascadeItem
 import com.quietping.ui.theme.glass
+import com.quietping.ui.theme.motionEnter
+import com.quietping.ui.theme.motionExit
+import com.quietping.ui.theme.riseIn
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -84,36 +86,38 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(key = "header") { HomeHeader() }
+            item(key = "header") { HomeHeader(modifier = Modifier.riseIn(0)) }
 
             item(key = "apps-section") {
-                SectionLabel(text = "Watched apps")
+                SectionLabel(text = "Watched apps", modifier = Modifier.riseIn(1))
             }
 
-            items(uiState.apps, key = { it.appPackage.name }) { status ->
+            itemsIndexed(uiState.apps, key = { _, status -> status.appPackage.name }) { index, status ->
                 AppToggleCard(
                     status = status,
                     onToggle = { enabled ->
                         viewModel.setAppEnabled(status.appPackage, enabled)
-                    }
+                    },
+                    modifier = cascadeItem(index)
                 )
             }
 
             item(key = "feed-section") {
                 Spacer(Modifier.height(8.dp))
-                SectionLabel(text = "Recent matches")
+                SectionLabel(text = "Recent matches", modifier = Modifier.riseIn(2))
             }
 
             if (uiState.isFeedEmpty) {
                 item(key = "feed-empty") { FeedEmptyState() }
             } else {
-                items(uiState.recentMatches, key = { it.matchId }) { match ->
+                itemsIndexed(uiState.recentMatches, key = { _, match -> match.matchId }) { index, match ->
                     MatchRow(
                         item = match,
                         // The MatchLog contract exposes a messageId but not the
                         // owning conversationId, and the injected repositories do
                         // not resolve one -> open the Vault conversation list.
-                        onClick = { onNavigate(Dest.Vault) }
+                        onClick = { onNavigate(Dest.Vault) },
+                        modifier = cascadeItem(index)
                     )
                 }
             }
@@ -125,8 +129,8 @@ fun HomeScreen(
 
 /** Greeting / brand header. */
 @Composable
-private fun HomeHeader() {
-    Column(modifier = Modifier.fillMaxWidth()) {
+private fun HomeHeader(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "QuietPing",
             style = MaterialTheme.typography.displaySmall,
@@ -144,12 +148,12 @@ private fun HomeHeader() {
 
 /** Uppercase section divider label (DESIGN.md typo-label treatment). */
 @Composable
-private fun SectionLabel(text: String) {
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
         color = TextTertiary,
-        modifier = Modifier.padding(vertical = 4.dp)
+        modifier = modifier.padding(vertical = 4.dp)
     )
 }
 
@@ -157,10 +161,11 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun AppToggleCard(
     status: AppStatus,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(GlassDefaults.CornerRadius))
             .glass(cornerRadius = GlassDefaults.CornerRadius)
@@ -205,13 +210,14 @@ private fun appSubtitle(status: AppStatus): String = when {
 @Composable
 private fun MatchRow(
     item: MatchFeedItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     androidx.compose.material3.Surface(
         onClick = onClick,
         shape = RoundedCornerShape(GlassDefaults.CornerRadius),
         color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -268,8 +274,8 @@ private fun matchSubtitle(item: MatchFeedItem): String {
 private fun FeedEmptyState() {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(),
-        exit = fadeOut()
+        enter = motionEnter(),
+        exit = motionExit()
     ) {
         Column(
             modifier = Modifier

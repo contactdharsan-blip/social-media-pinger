@@ -17,7 +17,14 @@ interface AlertDispatcher {
 
     /**
      * Deliver the alert for [match] on the channel implied by its rule, applying
-     * the rule's sound preset and DND override.
+     * the rule's sound preset and DND override. For a PERSISTENT rule this also
+     * starts a re-ping loop; for CRITICAL it posts a full-screen, DND-piercing alert.
      */
     fun fire(match: MatchResult)
+
+    /**
+     * Stop any active re-ping loop for [conversationId] — called when the source
+     * notification for that conversation is removed (i.e. the user has seen it).
+     */
+    fun cancelReminders(conversationId: Long)
 }

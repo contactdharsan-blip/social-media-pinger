@@ -7,4 +7,7 @@
     <string name="app_name_mono">QuietPing</string>
     <!-- Disguised / stealth alias deliberately reads as a generic utility. -->
     <string name="app_name_stealth">Utilities</string>
+
+    <!-- Face 2 (Xposed/LSPosed module) description shown in the LSPosed manager. -->
+    <string name="xposed_description">QuietPing deep capture: recovers deleted ("delete for everyone") messages inside the chat app\'s own UI. Requires root + LSPosed. Enable per-app from QuietPing.</string>
 </resources>

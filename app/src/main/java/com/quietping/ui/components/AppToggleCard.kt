@@ -12,8 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +51,7 @@ fun AppPackage.glyph(): ImageVector = when (this) {
     AppPackage.WHATSAPP -> Icons.AutoMirrored.Filled.Chat
     AppPackage.INSTAGRAM -> Icons.Filled.CameraAlt
     AppPackage.MESSENGER -> Icons.Filled.Forum
-    AppPackage.FACEBOOK -> Icons.Filled.Message
+    AppPackage.FACEBOOK -> Icons.AutoMirrored.Filled.Message
     AppPackage.SMS -> Icons.Filled.Sms
 }
 

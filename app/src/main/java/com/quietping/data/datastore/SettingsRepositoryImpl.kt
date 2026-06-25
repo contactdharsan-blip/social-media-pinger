@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.quietping.domain.settings.AlertPrefs
 import com.quietping.domain.settings.PrivacySettings
 import com.quietping.domain.settings.SettingsRepository
 import com.quietping.domain.settings.ThemeSettings
@@ -33,6 +34,16 @@ class SettingsRepositoryImpl @Inject constructor(
         // Privacy
         val BIOMETRIC_LOCK = booleanPreferencesKey("privacy_biometric_lock")
         val RETENTION_DAYS = intPreferencesKey("privacy_retention_days")
+        val SCREENSHOT_BLOCK = booleanPreferencesKey("privacy_screenshot_block")
+        val HIDE_NOTIF_CONTENT = booleanPreferencesKey("privacy_hide_notif_content")
+        val BREAK_IN_LOG = booleanPreferencesKey("privacy_break_in_log")
+        val DECOY_PIN_ENABLED = booleanPreferencesKey("privacy_decoy_pin_enabled")
+        val DECOY_PIN_HASH = stringPreferencesKey("privacy_decoy_pin_hash")
+
+        // Alerts
+        val DIGEST_ENABLED = booleanPreferencesKey("alerts_digest_enabled")
+        val DIGEST_HOUR = intPreferencesKey("alerts_digest_hour")
+        val OTP_AUTO_DELETE_HOURS = intPreferencesKey("alerts_otp_auto_delete_hours")
 
         // Icon
         val ACTIVE_ICON_ALIAS = stringPreferencesKey("active_icon_alias")
@@ -41,6 +52,7 @@ class SettingsRepositoryImpl @Inject constructor(
     /** Defaults sourced from the domain data classes (single source of truth). */
     private val themeDefaults = ThemeSettings()
     private val privacyDefaults = PrivacySettings()
+    private val alertDefaults = AlertPrefs()
 
     override val theme: Flow<ThemeSettings> = dataStore.data.map { prefs ->
         ThemeSettings(
@@ -54,7 +66,20 @@ class SettingsRepositoryImpl @Inject constructor(
     override val privacy: Flow<PrivacySettings> = dataStore.data.map { prefs ->
         PrivacySettings(
             biometricLock = prefs[Keys.BIOMETRIC_LOCK] ?: privacyDefaults.biometricLock,
-            retentionDays = prefs[Keys.RETENTION_DAYS] ?: privacyDefaults.retentionDays
+            retentionDays = prefs[Keys.RETENTION_DAYS] ?: privacyDefaults.retentionDays,
+            screenshotBlock = prefs[Keys.SCREENSHOT_BLOCK] ?: privacyDefaults.screenshotBlock,
+            hideNotificationContent = prefs[Keys.HIDE_NOTIF_CONTENT] ?: privacyDefaults.hideNotificationContent,
+            breakInLogEnabled = prefs[Keys.BREAK_IN_LOG] ?: privacyDefaults.breakInLogEnabled,
+            decoyPinEnabled = prefs[Keys.DECOY_PIN_ENABLED] ?: privacyDefaults.decoyPinEnabled,
+            decoyPinHash = prefs[Keys.DECOY_PIN_HASH] ?: privacyDefaults.decoyPinHash
+        )
+    }
+
+    override val alerts: Flow<AlertPrefs> = dataStore.data.map { prefs ->
+        AlertPrefs(
+            digestEnabled = prefs[Keys.DIGEST_ENABLED] ?: alertDefaults.digestEnabled,
+            digestHour = prefs[Keys.DIGEST_HOUR] ?: alertDefaults.digestHour,
+            otpAutoDeleteHours = prefs[Keys.OTP_AUTO_DELETE_HOURS] ?: alertDefaults.otpAutoDeleteHours
         )
     }
 
@@ -75,6 +100,19 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { prefs ->
             prefs[Keys.BIOMETRIC_LOCK] = p.biometricLock
             prefs[Keys.RETENTION_DAYS] = p.retentionDays
+            prefs[Keys.SCREENSHOT_BLOCK] = p.screenshotBlock
+            prefs[Keys.HIDE_NOTIF_CONTENT] = p.hideNotificationContent
+            prefs[Keys.BREAK_IN_LOG] = p.breakInLogEnabled
+            prefs[Keys.DECOY_PIN_ENABLED] = p.decoyPinEnabled
+            prefs[Keys.DECOY_PIN_HASH] = p.decoyPinHash
+        }
+    }
+
+    override suspend fun setAlerts(a: AlertPrefs) {
+        dataStore.edit { prefs ->
+            prefs[Keys.DIGEST_ENABLED] = a.digestEnabled
+            prefs[Keys.DIGEST_HOUR] = a.digestHour
+            prefs[Keys.OTP_AUTO_DELETE_HOURS] = a.otpAutoDeleteHours
         }
     }
 

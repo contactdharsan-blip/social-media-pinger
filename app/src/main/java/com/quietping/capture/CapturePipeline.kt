@@ -110,15 +110,63 @@ class CapturePipeline @Inject constructor(
             is RawEvent.AccessibilityCaptured -> handleAccessibility(event)
             is RawEvent.NotificationRemoved -> handleNotificationRemoved(event)
             is RawEvent.SmsChanged -> handleSmsChanged(event)
+            is RawEvent.DeepHookRecovered -> handleDeepHookRecovered(event)
         }
+    }
+
+    /**
+     * A "delete for everyone" message recovered by the Face 2 Xposed hook (delivered via the
+     * UID-gated [com.quietping.capture.DeepCaptureProvider]). Archive it through the normal vault
+     * path so the recovered original surfaces in the Vault and can still match rules — exactly like
+     * any other captured message, just sourced from inside the target app.
+     */
+    private suspend fun handleDeepHookRecovered(event: RawEvent.DeepHookRecovered) {
+        val app = AppPackage.fromPackageId(event.packageName) ?: return
+        val conversationId = messageRepository.resolveConversationId(
+            appPackage = app,
+            conversationKey = event.conversationKey,
+            displayName = event.sender.takeIf { it.isNotBlank() } ?: app.name,
+            isGroup = false,
+        )
+        val now = System.currentTimeMillis()
+        ingestAndMatch(
+            Message(
+                id = 0L,
+                conversationId = conversationId,
+                sender = event.sender,
+                postedAt = event.postedAt.takeIf { it > 0L } ?: now,
+                capturedAt = now,
+                source = com.quietping.domain.model.CaptureSource.DEEP_HOOK,
+                status = com.quietping.domain.model.MessageStatus.ACTIVE,
+                currentBody = event.body,
+            ),
+            app,
+        )
     }
 
     private suspend fun handleNotification(event: RawEvent.NotificationPosted) {
         val parser = parsers.firstOrNull { it.canParse(event) } ?: return
         val messages = parser.parse(event)
         if (messages.isEmpty()) return
+
+        // Resolve (find-or-create) the conversation row ONCE before ingesting its
+        // messages: every MessageEntity carries a FK to this conversation, so the
+        // parent row must exist first (parsers emit conversationId = 0).
+        val app = AppPackage.fromPackageId(event.packageName) ?: return
+        val displayName = event.title?.takeIf { it.isNotBlank() }
+            ?: event.messages.firstOrNull()?.first
+            ?: app.name
+        val isGroup = !event.subText.isNullOrBlank() ||
+            event.messages.mapNotNull { it.first }.distinct().size > 1
+        val conversationId = messageRepository.resolveConversationId(
+            appPackage = app,
+            conversationKey = event.key,
+            displayName = displayName,
+            isGroup = isGroup
+        )
+
         for (message in messages) {
-            ingestAndMatch(message)
+            ingestAndMatch(message.copy(conversationId = conversationId), app)
         }
         detectArrayDeletions(event)
     }
@@ -174,9 +222,25 @@ class CapturePipeline @Inject constructor(
         val parser = parsers.firstOrNull { it.canParse(adapted) } ?: return
         val messages = parser.parse(adapted)
         if (messages.isEmpty()) return
+
+        // Resolve the conversation row before ingest (FK parent), mirroring the
+        // notification path. Accessibility captures are always single-author text.
+        val app = AppPackage.fromPackageId(event.packageName) ?: return
+        val displayName = event.title?.takeIf { it.isNotBlank() } ?: app.name
+        val conversationId = messageRepository.resolveConversationId(
+            appPackage = app,
+            conversationKey = adapted.key,
+            displayName = displayName,
+            isGroup = false
+        )
+
         for (message in messages) {
             ingestAndMatch(
-                message.copy(source = com.quietping.domain.model.CaptureSource.ACCESSIBILITY),
+                message.copy(
+                    conversationId = conversationId,
+                    source = com.quietping.domain.model.CaptureSource.ACCESSIBILITY,
+                ),
+                app,
             )
         }
     }
@@ -195,8 +259,16 @@ class CapturePipeline @Inject constructor(
      * apps where no finer id is available.
      */
     private suspend fun handleNotificationRemoved(event: RawEvent.NotificationRemoved) {
-        if (event.reason in USER_DISMISS_REASONS) return
         val app = AppPackage.fromPackageId(event.packageName) ?: return
+
+        // Read signal: the source app removing its own notification (read, swipe,
+        // tap, or app-driven) means the user has engaged — stop any re-ping loop for
+        // that conversation. Done for EVERY reason, before the deletion filter below.
+        messageRepository.conversationIdFor(app, event.key)?.let { convId ->
+            alertDispatcher.cancelReminders(convId)
+        }
+
+        if (event.reason in USER_DISMISS_REASONS) return
         vaultManager.markDeleted(
             conversationKey = event.key,
             appPackage = app,
@@ -223,9 +295,24 @@ class CapturePipeline @Inject constructor(
     /**
      * Entry point used by [SmsObserver] for already-read SMS [Message]s: archive +
      * evaluate rules exactly like a parsed notification.
+     *
+     * The observer carries the SMS thread id raw in [Message.conversationId] (it has
+     * no [MessageRepository] handle). We resolve it here into a real conversation row
+     * id (its FK parent) before ingesting — using the thread id as the stable
+     * conversation key and the sender/address as the display name.
+     *
+     * [isGroup] is the observer's per-thread multi-recipient verdict (group MMS
+     * threads have more than one recipient); it feeds the per-group mute gate the
+     * same way notification groups do.
      */
-    suspend fun ingestSms(message: Message) {
-        ingestAndMatch(message)
+    suspend fun ingestSms(message: Message, isGroup: Boolean = false) {
+        val conversationId = messageRepository.resolveConversationId(
+            appPackage = AppPackage.SMS,
+            conversationKey = message.conversationId.toString(),
+            displayName = message.sender,
+            isGroup = isGroup
+        )
+        ingestAndMatch(message.copy(conversationId = conversationId), AppPackage.SMS)
     }
 
     /**
@@ -235,30 +322,49 @@ class CapturePipeline @Inject constructor(
         vaultManager.markDeleted(conversationKey, AppPackage.SMS, body)
     }
 
-    private suspend fun ingestAndMatch(message: Message) {
+    private suspend fun ingestAndMatch(message: Message, app: AppPackage) {
         // 1. Always archive into the encrypted Vault first (capture-everything).
-        vaultManager.ingest(message)
+        //    ingest returns the stored row id (new, deduped, or edited) so the match
+        //    and its audit log reference the real message id rather than 0.
+        val storedId = vaultManager.ingest(message)
+        val matched = message.copy(id = storedId)
+
+        // 1b. Per-group mute gate (watch-specific-groups). A group the user muted is
+        //     fully archived above but never evaluated for alerts. 1:1 chats and
+        //     watched groups fall through to normal rule evaluation. The conversation
+        //     row always exists here — callers resolve it before ingest.
+        val conversation = messageRepository.conversationById(message.conversationId)
+        if (conversation != null && conversation.isGroup && !conversation.watched) return
 
         // 2. Evaluate enabled rules for this message's app and fire any matches.
-        val app = appPackageFor(message) ?: return
         val rules = ruleRepository.rulesFor(app).first().filter { it.enabled }
         if (rules.isEmpty()) return
 
-        val matches = ruleEngine.evaluate(message, rules)
+        val matches = ruleEngine.evaluate(matched, rules)
+        if (matches.isEmpty()) return
+
+        // A SUPPRESS rule wins: the message is still archived (capture-everything),
+        // but no alert fires — keyword/phrase blocking (Bundle 4). Takes precedence
+        // over any ALERT match on the same message.
+        if (matches.any { it.rule.action == com.quietping.domain.model.RuleAction.SUPPRESS }) {
+            return
+        }
+
+        // Time-windowed rules (Bundle 2): only fire matches whose active window
+        // includes the current local time. RuleEngine stays content-pure; the clock
+        // gate lives here.
+        val nowMin = currentMinuteOfDay()
         for (match in matches) {
-            alertDispatcher.fire(match)
+            if (match.rule.activeAt(nowMin)) {
+                alertDispatcher.fire(match)
+            }
         }
     }
 
-    /**
-     * Resolve the [AppPackage] for a [Message]. The domain [Message] references its
-     * conversation by id; we look the conversation up through the repository to read
-     * its app. Falls back to null (skip rule matching) when the conversation is not
-     * yet visible.
-     */
-    private suspend fun appPackageFor(message: Message): AppPackage? {
-        val conversations = messageRepository.conversations().first()
-        return conversations.firstOrNull { it.id == message.conversationId }?.appPackage
+    /** Current local time as minutes-since-midnight (0..1439), for rule windows. */
+    private fun currentMinuteOfDay(): Int {
+        val now = java.time.LocalTime.now()
+        return now.hour * 60 + now.minute
     }
 
     private companion object {

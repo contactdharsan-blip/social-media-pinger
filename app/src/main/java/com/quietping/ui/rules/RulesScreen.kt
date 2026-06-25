@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -46,6 +46,8 @@ import com.quietping.ui.components.SectionHeader
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.cascadeItem
+import com.quietping.ui.theme.riseIn
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextTertiary
@@ -72,6 +74,7 @@ fun RulesScreen(
     ) {
         item(key = "header") {
             SectionHeader(
+                modifier = Modifier.riseIn(0),
                 title = "Rules",
                 subtitle = if (state.totalCount > 0) {
                     "${state.enabledCount} of ${state.totalCount} active"
@@ -92,6 +95,7 @@ fun RulesScreen(
         if (state.isEmpty) {
             item(key = "empty") {
                 EmptyState(
+                    modifier = Modifier.riseIn(1),
                     icon = Icons.Filled.RuleFolder,
                     title = "No rules yet",
                     message = "Create a rule to get pinged for the messages that matter — a name mention, a keyword, a VIP, and more.",
@@ -110,14 +114,15 @@ fun RulesScreen(
                 item(key = "group_${group.app.name}") {
                     AppGroupHeader(app = group.app, count = group.rules.size)
                 }
-                items(
+                itemsIndexed(
                     items = group.rules,
-                    key = { rule -> "rule_${rule.id}" }
-                ) { rule ->
+                    key = { _, rule -> "rule_${rule.id}" }
+                ) { index, rule ->
                     RuleCard(
                         rule = rule,
                         onToggle = { enabled -> viewModel.setEnabled(rule, enabled) },
-                        onClick = { onNavigate(Dest.RuleEditor) }
+                        onClick = { onNavigate(Dest.RuleEditor) },
+                        modifier = cascadeItem(index)
                     )
                 }
             }

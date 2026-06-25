@@ -47,6 +47,9 @@ class SmsObserver private constructor(
     /** Conversation key (thread id as string) last known for each SMS row id. */
     private val rowConversationKey = HashMap<Long, String>()
 
+    /** Cached per-thread group verdict (recipient count > 1), to avoid re-querying. */
+    private val threadIsGroup = HashMap<Long, Boolean>()
+
     /** Highest SMS row id ingested so far; only rows above it are treated as new. */
     @Volatile
     private var lastMaxId: Long = -1L
@@ -74,15 +77,56 @@ class SmsObserver private constructor(
     private suspend fun processChange(applicationContext: Context) {
         val newMessages = readNewSms(applicationContext)
         for (message in newMessages) {
-            pipeline.ingestSms(message)
+            // The SMS thread id rides raw in conversationId until the pipeline resolves
+            // it; use it to classify the thread as a group (multi-recipient MMS) so the
+            // per-group mute gate applies to SMS groups just like app groups.
+            val isGroup = isGroupThread(applicationContext, message.conversationId)
+            pipeline.ingestSms(message, isGroup = isGroup)
         }
         detectDeletions(applicationContext)
     }
 
     /**
+     * Classify an SMS/MMS thread as a group by counting its recipients. Android stores
+     * the canonical recipient ids for a thread (space-separated) in the simple
+     * conversations view; more than one recipient ⇒ a group thread. Cached per thread;
+     * fails safe to non-group on any provider/permission error.
+     */
+    private fun isGroupThread(context: Context, threadId: Long): Boolean {
+        threadIsGroup[threadId]?.let { return it }
+        val recipientIds: String? = try {
+            context.contentResolver.query(
+                CONVERSATIONS_URI,
+                arrayOf(RECIPIENT_IDS),
+                "${Telephony.Threads._ID} = ?",
+                arrayOf(threadId.toString()),
+                null,
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    val col = c.getColumnIndex(RECIPIENT_IDS)
+                    if (col >= 0) c.getString(col) else null
+                } else {
+                    null
+                }
+            }
+        } catch (se: SecurityException) {
+            null
+        } catch (e: Exception) {
+            Log.w(TAG, "SMS recipient lookup failed for thread $threadId", e)
+            null
+        }
+        val isGroup = SmsGrouping.isGroupThread(recipientIds)
+        threadIsGroup[threadId] = isGroup
+        return isGroup
+    }
+
+    /**
      * Read SMS rows newer than the last ingested id and map them to domain
-     * [Message]s. The SMS thread id is carried in [Message.conversationId]; the
-     * stable conversation key (thread id as string) is tracked internally for
+     * [Message]s. The SMS thread id is carried *raw* in [Message.conversationId] as a
+     * conversation key — [CapturePipeline.ingestSms] resolves it into a real
+     * conversation row id (the message's FK parent) before persisting, so this
+     * observer needs no [com.quietping.domain.repo.MessageRepository] handle. The
+     * stable conversation key (thread id as string) is also tracked internally for
      * deletion diffing. Returns an empty list when [android.Manifest.permission.READ_SMS]
      * is not held or no new rows exist (fail safe).
      */
@@ -205,6 +249,12 @@ class SmsObserver private constructor(
 
         private val SMS_URI: Uri = Telephony.Sms.CONTENT_URI
         private val MMS_URI: Uri = Telephony.Mms.CONTENT_URI
+
+        /** Simple conversations view exposing per-thread `recipient_ids`. */
+        private val CONVERSATIONS_URI: Uri = Telephony.Threads.CONTENT_URI
+
+        /** Space-separated canonical recipient ids for a thread. */
+        private const val RECIPIENT_IDS = "recipient_ids"
 
         private val PROJECTION = arrayOf(
             Telephony.Sms._ID,

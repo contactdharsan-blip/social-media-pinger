@@ -27,9 +27,9 @@ import javax.inject.Inject
  *    version and flags the message EDITED;
  *  - anything else inserts a fresh message with version 1.
  *
- * Conversation resolution helpers ([upsertConversation], [resolveConversationId])
- * are exposed beyond the [MessageRepository] interface for the capture/vault layer
- * (which must create a conversation before ingesting its first message).
+ * [resolveConversationId] (part of the [MessageRepository] contract) and the local
+ * [upsertConversation] helper let the capture/vault layer create a conversation
+ * before ingesting its first message (its foreign-key parent).
  */
 class MessageRepositoryImpl @Inject constructor(
     private val db: AppDatabase,
@@ -108,13 +108,30 @@ class MessageRepositoryImpl @Inject constructor(
         messageDao.deleteOlderThan(epochMillis)
     }
 
+    override suspend fun conversationIdFor(appPackage: AppPackage, conversationKey: String): Long? =
+        conversationDao.findByKey(appPackage, conversationKey)?.id
+
+    override suspend fun conversationById(id: Long): Conversation? =
+        conversationDao.findById(id)?.toDomain()
+
+    override suspend fun setWatched(id: Long, watched: Boolean) =
+        conversationDao.setWatched(id, watched)
+
+    override suspend fun purgeOtpOlderThan(epochMillis: Long): Int = db.withTransaction {
+        val otpIds = messageDao
+            .bodiesBySourceOlderThan(com.quietping.domain.model.CaptureSource.SMS, epochMillis)
+            .filter { com.quietping.domain.parser.PatternCatalog.isOtp(it.body) }
+            .map { it.id }
+        if (otpIds.isEmpty()) 0 else messageDao.deleteByIds(otpIds)
+    }
+
     // ---- Conversation resolution (beyond the interface) ----
 
     /**
      * Find or create the conversation identified by ([appPackage], [conversationKey]),
      * refreshing its display name / group flag, and return its row id. Idempotent.
      */
-    suspend fun resolveConversationId(
+    override suspend fun resolveConversationId(
         appPackage: AppPackage,
         conversationKey: String,
         displayName: String,

@@ -2,6 +2,7 @@ package com.quietping.ui.settings
 
 import android.content.Context
 import androidx.biometric.BiometricManager
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,16 +18,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,8 +57,10 @@ import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.BgTertiary
 import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
+import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.StatusError
+import com.quietping.ui.theme.animateSizeChange
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 
@@ -68,6 +81,7 @@ fun PrivacyLockScreen(
     val context = LocalContext.current
     val biometricAvailable = remember { isBiometricAvailable(context) }
     var showPurgeConfirm by remember { mutableStateOf(false) }
+    var showDecoyDialog by remember { mutableStateOf(false) }
 
     // Surface the purge result, then auto-dismiss it after it is shown.
     LaunchedEffect(state.purgeResult) {
@@ -110,6 +124,94 @@ fun PrivacyLockScreen(
                         )
                     }
                 )
+                Spacer(Modifier.height(8.dp))
+                DecoyPinRow(
+                    configured = state.privacy.decoyPinEnabled,
+                    onClick = { showDecoyDialog = true }
+                )
+            }
+        }
+
+        item {
+            SettingsGlassCard {
+                SectionLabel("Screen privacy")
+                Spacer(Modifier.height(8.dp))
+                ToggleRow(
+                    icon = Icons.Outlined.Visibility,
+                    title = "Block screenshots",
+                    subtitle = "Stop screenshots, screen recording, and recents previews",
+                    trailing = {
+                        GlassSwitch(
+                            checked = state.privacy.screenshotBlock,
+                            onCheckedChange = viewModel::setScreenshotBlock
+                        )
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+                ToggleRow(
+                    icon = Icons.Outlined.NotificationsOff,
+                    title = "Hide alert content",
+                    subtitle = "Show a generic alert instead of the message text",
+                    trailing = {
+                        GlassSwitch(
+                            checked = state.privacy.hideNotificationContent,
+                            onCheckedChange = viewModel::setHideNotificationContent
+                        )
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+                ToggleRow(
+                    icon = Icons.Outlined.Warning,
+                    title = "Break-in log",
+                    subtitle = "Record failed unlock attempts",
+                    trailing = {
+                        GlassSwitch(
+                            checked = state.privacy.breakInLogEnabled,
+                            onCheckedChange = viewModel::setBreakInLogEnabled
+                        )
+                    }
+                )
+            }
+        }
+
+        if (state.privacy.breakInLogEnabled) {
+            item {
+                SettingsGlassCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("Break-in attempts")
+                        Spacer(Modifier.weight(1f))
+                        if (state.breakIns.isNotEmpty()) {
+                            TextButton(onClick = viewModel::clearBreakIns) {
+                                Text("Clear", color = TextSecondary)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    if (state.breakIns.isEmpty()) {
+                        Text(
+                            text = "No failed unlock attempts recorded.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextTertiary
+                        )
+                    } else {
+                        state.breakIns.take(8).forEach { event ->
+                            Text(
+                                text = "• ${breakInLabel(event.reason)} — ${formatTime(event.attemptedAt)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            SettingsGlassCard {
+                SectionLabel("Advanced capture")
+                Spacer(Modifier.height(8.dp))
+                DeepCaptureRow(onClick = { onNavigate(Dest.DeepCapture) })
             }
         }
 
@@ -169,6 +271,129 @@ fun PrivacyLockScreen(
             onDismiss = { showPurgeConfirm = false }
         )
     }
+
+    if (showDecoyDialog) {
+        DecoyPinDialog(
+            configured = state.privacy.decoyPinEnabled,
+            onSet = { pin -> viewModel.setDecoyPin(pin); showDecoyDialog = false },
+            onClear = { viewModel.clearDecoyPin(); showDecoyDialog = false },
+            onDismiss = { showDecoyDialog = false }
+        )
+    }
+}
+
+/** A row that opens the decoy-PIN dialog; shows whether one is configured. */
+@Composable
+private fun DecoyPinRow(configured: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Password,
+            contentDescription = null,
+            tint = TextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Decoy PIN",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (configured)
+                    "Set — entering it opens an empty vault"
+                else
+                    "Open an empty vault under coercion",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextTertiary
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextTertiary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun DecoyPinDialog(
+    configured: Boolean,
+    onSet: (String) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = TextSecondary,
+        icon = { Icon(Icons.Outlined.Password, contentDescription = null, tint = Emerald400) },
+        title = { Text(if (configured) "Change decoy PIN" else "Set decoy PIN") },
+        text = {
+            Column {
+                Text(
+                    "Entering this PIN at the lock screen opens an empty vault — useful if " +
+                        "someone forces you to unlock the app. Use a different PIN from your real one.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { if (it.length <= 12 && it.all(Char::isDigit)) pin = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("New PIN (4–12 digits)") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = ImeAction.Done
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (pin.length >= 4) onSet(pin) },
+                enabled = pin.length >= 4
+            ) {
+                Text("Save", color = Emerald400, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            if (configured) {
+                TextButton(onClick = onClear) { Text("Remove", color = StatusError) }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+            }
+        }
+    )
+}
+
+private fun breakInLabel(reason: String): String = when (reason) {
+    "biometric_failed" -> "Failed biometric"
+    "pin_failed" -> "Wrong PIN"
+    else -> "Failed unlock"
+}
+
+/** Short absolute time label for a break-in row (local time, no date library churn). */
+private fun formatTime(epochMillis: Long): String {
+    val dt = java.time.Instant.ofEpochMilli(epochMillis)
+        .atZone(java.time.ZoneId.systemDefault())
+    return "%04d-%02d-%02d %02d:%02d".format(
+        dt.year, dt.monthValue, dt.dayOfMonth, dt.hour, dt.minute
+    )
 }
 
 /** Selectable retention-window chips (days). */
@@ -198,8 +423,16 @@ private fun RetentionChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f)
-    val fg = if (selected) OnAccent else TextSecondary
+    val bg by animateColorAsState(
+        targetValue = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f),
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "retentionChipBg"
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) OnAccent else TextSecondary,
+        animationSpec = MotionTokens.signatureSpring(),
+        label = "retentionChipFg"
+    )
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
@@ -223,6 +456,47 @@ private fun retentionLabel(days: Int): String = when {
     else -> "${days}d"
 }
 
+/** A row that opens the Deep capture (root/LSPosed) sub-screen. */
+@Composable
+private fun DeepCaptureRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Visibility,
+            contentDescription = null,
+            tint = TextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Deep capture (root)",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Hook chat apps on a rooted LSPosed device to recover " +
+                    "deleted-before-read messages.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextTertiary
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextTertiary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
 /** The destructive "Purge now" row + state-aware label. */
 @Composable
 private fun PurgeRow(result: PurgeResult?, onClick: () -> Unit) {
@@ -230,6 +504,7 @@ private fun PurgeRow(result: PurgeResult?, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .animateSizeChange()
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
             .background(StatusError.copy(alpha = 0.14f))
             .then(if (running) Modifier else Modifier.clickable(onClick = onClick))

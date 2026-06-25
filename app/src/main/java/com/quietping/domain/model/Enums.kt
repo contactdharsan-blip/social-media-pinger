@@ -46,7 +46,10 @@ enum class MessageStatus {
 enum class CaptureSource {
     NOTIFICATION,
     SMS,
-    ACCESSIBILITY
+    ACCESSIBILITY,
+
+    /** Recovered from inside the target app by the Face 2 Xposed hook (root + LSPosed). */
+    DEEP_HOOK
 }
 
 /**

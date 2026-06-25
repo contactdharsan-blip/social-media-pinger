@@ -31,5 +31,13 @@ data class ConversationEntity(
     val displayName: String,
 
     @ColumnInfo(name = "is_group")
-    val isGroup: Boolean
+    val isGroup: Boolean,
+
+    /**
+     * User's per-group alert switch. `true` (default) = evaluate incoming messages
+     * against the RuleEngine; `false` = mute (still archived, never alerts). Only
+     * acted on for groups — see [com.quietping.domain.model.Conversation.watched].
+     */
+    @ColumnInfo(name = "watched", defaultValue = "1")
+    val watched: Boolean = true
 )

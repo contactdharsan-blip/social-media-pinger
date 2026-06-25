@@ -7,8 +7,12 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.quietping.data.db.entities.MessageEntity
+import com.quietping.domain.model.CaptureSource
 import com.quietping.domain.model.MessageStatus
 import kotlinx.coroutines.flow.Flow
+
+/** Lightweight (id, body) projection for content-aware purges (e.g. OTP cleanup). */
+data class MessageIdBody(val id: Long, val body: String)
 
 /**
  * DAO for [MessageEntity]. Read queries are [Transaction]-wrapped and return
@@ -88,4 +92,23 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE captured_at < :epochMillis")
     suspend fun deleteOlderThan(epochMillis: Long): Int
+
+    // ---- Content-aware purge (OTP auto-delete) ----
+
+    /**
+     * (id, current body) for messages of [source] captured before [cutoff]. Used by
+     * the OTP-cleanup worker to filter OTP texts in Kotlin (the body lives in the
+     * version table) before deleting them by id.
+     */
+    @Query(
+        """
+        SELECT m.id AS id, v.body AS body FROM messages AS m
+        INNER JOIN message_versions AS v ON v.id = m.current_version_id
+        WHERE m.source = :source AND m.captured_at < :cutoff
+        """
+    )
+    suspend fun bodiesBySourceOlderThan(source: CaptureSource, cutoff: Long): List<MessageIdBody>
+
+    @Query("DELETE FROM messages WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>): Int
 }
