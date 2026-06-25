@@ -96,6 +96,11 @@ sealed interface Dest {
         override val route: String = "about"
     }
 
+    /** Help: static explainer of the app's purpose, features, flows, and glossary. */
+    data object Help : Dest {
+        override val route: String = "help"
+    }
+
     companion object {
         /** The bottom-navigation root destinations, in display order. */
         val bottomNavRoots: List<Dest> = listOf(Home, Vault, Rules, AlertSettings)

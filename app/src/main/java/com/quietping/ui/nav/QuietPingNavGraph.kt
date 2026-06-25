@@ -65,6 +65,7 @@ import com.quietping.ui.settings.AboutScreen
 import com.quietping.ui.settings.AlertSettingsScreen
 import com.quietping.ui.settings.AppearanceScreen
 import com.quietping.ui.settings.DeepCaptureScreen
+import com.quietping.ui.settings.HelpScreen
 import com.quietping.ui.settings.PrivacyLockScreen
 import com.quietping.ui.vault.VaultMediaScreen
 import com.quietping.ui.vault.VaultScreen
@@ -260,6 +261,11 @@ private fun QuietPingNavHost(
         composable(Dest.About.route) {
             Box(Modifier.statusBarsPadding()) {
                 AboutScreen(onBack = back)
+            }
+        }
+        composable(Dest.Help.route) {
+            Box(Modifier.statusBarsPadding()) {
+                HelpScreen(onBack = back)
             }
         }
     }

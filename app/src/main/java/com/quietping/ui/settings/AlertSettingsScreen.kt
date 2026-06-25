@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.outlined.DoNotDisturbOn
@@ -174,6 +175,15 @@ private fun MoreSettingsCard(onNavigate: (Dest) -> Unit) {
             onClick = { onNavigate(Dest.PrivacyLock) },
             role = Role.Button,
             onClickLabel = "Open privacy and lock settings",
+            trailing = { NavChevron() }
+        )
+        ListRow(
+            title = "Help",
+            subtitle = "What QuietPing does, its features, and how to use it",
+            leadingIcon = Icons.AutoMirrored.Outlined.HelpOutline,
+            onClick = { onNavigate(Dest.Help) },
+            role = Role.Button,
+            onClickLabel = "Open help",
             trailing = { NavChevron() }
         )
         ListRow(
