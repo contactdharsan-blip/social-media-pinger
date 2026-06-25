@@ -2,7 +2,6 @@ package com.quietping.ui.settings
 
 import android.content.Context
 import androidx.biometric.BiometricManager
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,17 +47,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.quietping.ui.components.ChoiceChip
+import com.quietping.ui.components.GlassCard
+import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.SettingToggleRow
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.BgTertiary
-import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
-import com.quietping.ui.theme.MotionTokens
-import com.quietping.ui.theme.OnAccent
+import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusError
 import com.quietping.ui.theme.animateSizeChange
 import com.quietping.ui.theme.TextSecondary
@@ -105,24 +104,21 @@ fun PrivacyLockScreen(
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("App lock")
+            GlassCard {
+                SectionHeader(title = "App lock")
                 Spacer(Modifier.height(8.dp))
-                ToggleRow(
-                    icon = Icons.Outlined.Fingerprint,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.Fingerprint,
                     title = "Biometric lock",
                     subtitle = if (biometricAvailable)
                         "Require fingerprint or face to open QuietPing"
                     else
                         "No biometrics enrolled on this device",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.privacy.biometricLock && biometricAvailable,
-                            onCheckedChange = { enabled ->
-                                if (biometricAvailable) viewModel.setBiometricLock(enabled)
-                            }
-                        )
-                    }
+                    checked = state.privacy.biometricLock && biometricAvailable,
+                    onCheckedChange = { enabled ->
+                        if (biometricAvailable) viewModel.setBiometricLock(enabled)
+                    },
+                    enabled = biometricAvailable
                 )
                 Spacer(Modifier.height(8.dp))
                 DecoyPinRow(
@@ -133,53 +129,40 @@ fun PrivacyLockScreen(
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Screen privacy")
+            GlassCard {
+                SectionHeader(title = "Screen privacy")
                 Spacer(Modifier.height(8.dp))
-                ToggleRow(
-                    icon = Icons.Outlined.Visibility,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.Visibility,
                     title = "Block screenshots",
                     subtitle = "Stop screenshots, screen recording, and recents previews",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.privacy.screenshotBlock,
-                            onCheckedChange = viewModel::setScreenshotBlock
-                        )
-                    }
+                    checked = state.privacy.screenshotBlock,
+                    onCheckedChange = viewModel::setScreenshotBlock
                 )
                 Spacer(Modifier.height(8.dp))
-                ToggleRow(
-                    icon = Icons.Outlined.NotificationsOff,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.NotificationsOff,
                     title = "Hide alert content",
                     subtitle = "Show a generic alert instead of the message text",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.privacy.hideNotificationContent,
-                            onCheckedChange = viewModel::setHideNotificationContent
-                        )
-                    }
+                    checked = state.privacy.hideNotificationContent,
+                    onCheckedChange = viewModel::setHideNotificationContent
                 )
                 Spacer(Modifier.height(8.dp))
-                ToggleRow(
-                    icon = Icons.Outlined.Warning,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.Warning,
                     title = "Break-in log",
                     subtitle = "Record failed unlock attempts",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.privacy.breakInLogEnabled,
-                            onCheckedChange = viewModel::setBreakInLogEnabled
-                        )
-                    }
+                    checked = state.privacy.breakInLogEnabled,
+                    onCheckedChange = viewModel::setBreakInLogEnabled
                 )
             }
         }
 
         if (state.privacy.breakInLogEnabled) {
             item {
-                SettingsGlassCard {
+                GlassCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionLabel("Break-in attempts")
-                        Spacer(Modifier.weight(1f))
+                        SectionHeader(title = "Break-in attempts", modifier = Modifier.weight(1f))
                         if (state.breakIns.isNotEmpty()) {
                             TextButton(onClick = viewModel::clearBreakIns) {
                                 Text("Clear", color = TextSecondary)
@@ -187,14 +170,18 @@ fun PrivacyLockScreen(
                         }
                     }
                     Spacer(Modifier.height(4.dp))
-                    if (state.breakIns.isEmpty()) {
-                        Text(
+                    when {
+                        state.errorMessage != null -> Text(
+                            text = state.errorMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StatusError
+                        )
+                        state.breakIns.isEmpty() -> Text(
                             text = "No failed unlock attempts recorded.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextTertiary
                         )
-                    } else {
-                        state.breakIns.take(8).forEach { event ->
+                        else -> state.breakIns.take(8).forEach { event ->
                             Text(
                                 text = "• ${breakInLabel(event.reason)} — ${formatTime(event.attemptedAt)}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -208,16 +195,16 @@ fun PrivacyLockScreen(
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Advanced capture")
+            GlassCard {
+                SectionHeader(title = "Advanced capture")
                 Spacer(Modifier.height(8.dp))
                 DeepCaptureRow(onClick = { onNavigate(Dest.DeepCapture) })
             }
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Retention")
+            GlassCard {
+                SectionHeader(title = "Retention")
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -249,8 +236,8 @@ fun PrivacyLockScreen(
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Clear now")
+            GlassCard {
+                SectionHeader(title = "Clear now")
                 Spacer(Modifier.height(8.dp))
                 PurgeRow(
                     result = state.purgeResult,
@@ -332,13 +319,14 @@ private fun DecoyPinDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val accent = LocalQuietPingTheme.current.accent
     var pin by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = TextSecondary,
-        icon = { Icon(Icons.Outlined.Password, contentDescription = null, tint = Emerald400) },
+        icon = { Icon(Icons.Outlined.Password, contentDescription = null, tint = accent) },
         title = { Text(if (configured) "Change decoy PIN" else "Set decoy PIN") },
         text = {
             Column {
@@ -368,7 +356,7 @@ private fun DecoyPinDialog(
                 onClick = { if (pin.length >= 4) onSet(pin) },
                 enabled = pin.length >= 4
             ) {
-                Text("Save", color = Emerald400, fontWeight = FontWeight.SemiBold)
+                Text("Save", color = accent, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
@@ -403,8 +391,8 @@ private fun RetentionChips(selectedDays: Int, onSelect: (Int) -> Unit) {
         RETENTION_OPTIONS.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { days ->
-                    RetentionChip(
-                        days = days,
+                    ChoiceChip(
+                        label = retentionLabel(days),
                         selected = days == selectedDays,
                         onClick = { onSelect(days) },
                         modifier = Modifier.weight(1f)
@@ -413,40 +401,6 @@ private fun RetentionChips(selectedDays: Int, onSelect: (Int) -> Unit) {
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-    }
-}
-
-@Composable
-private fun RetentionChip(
-    days: Int,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg by animateColorAsState(
-        targetValue = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f),
-        animationSpec = MotionTokens.signatureSpring(),
-        label = "retentionChipBg"
-    )
-    val fg by animateColorAsState(
-        targetValue = if (selected) OnAccent else TextSecondary,
-        animationSpec = MotionTokens.signatureSpring(),
-        label = "retentionChipFg"
-    )
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = retentionLabel(days),
-            style = MaterialTheme.typography.labelLarge,
-            color = fg,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-        )
     }
 }
 
@@ -576,12 +530,13 @@ private fun PurgeConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 /** The on-device-only disclosure: export and cloud sync are impossible by design. */
 @Composable
 private fun ExportDisabledNote() {
-    SettingsGlassCard {
+    val accent = LocalQuietPingTheme.current.accent
+    GlassCard {
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = Icons.Outlined.CloudOff,
                 contentDescription = null,
-                tint = Emerald400,
+                tint = accent,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(12.dp))

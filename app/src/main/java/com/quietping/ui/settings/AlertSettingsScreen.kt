@@ -7,7 +7,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,21 +21,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.outlined.DoNotDisturbOn
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,31 +46,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
+import com.quietping.ui.components.ChoiceChip
+import com.quietping.ui.components.GlassCard
+import com.quietping.ui.components.ListRow
+import com.quietping.ui.components.PillBadge
+import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.SettingToggleRow
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.BgTertiary
-import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
-import com.quietping.ui.theme.MotionTokens
-import com.quietping.ui.theme.OnAccent
+import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusAlert
 import com.quietping.ui.theme.animateSizeChange
 import com.quietping.ui.theme.cascadeItem
 import com.quietping.ui.theme.riseIn
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
-import com.quietping.ui.theme.glass
 
 /**
  * Per-condition alert settings (PRD §8 / §9.1). For each [TriggerType] the user can
  * pick a sound preset (with a live preview), toggle vibration, and toggle the
  * Do-Not-Disturb override. Changes write through to the rules of that condition.
+ *
+ * This screen is also the bottom-nav "Settings" hub: a trailing "More" section links
+ * out to Appearance, Privacy & lock, and About.
  *
  * Content-only: the Scaffold/top-bar/bottom-nav live in the nav graph.
  */
@@ -96,6 +100,16 @@ fun AlertSettingsScreen(
                 subtitle = "A separate notification channel per condition — its own " +
                     "sound, vibration, and Do Not Disturb behavior."
             )
+        }
+        state.errorMessage?.let { msg ->
+            item(key = "error") {
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         itemsIndexed(state.configs, key = { _, config -> config.triggerType.name }) { index, config ->
             AlertConditionCard(
@@ -131,7 +145,58 @@ fun AlertSettingsScreen(
                 onSelectHours = viewModel::setOtpAutoDeleteHours
             )
         }
+
+        item(key = "more") {
+            MoreSettingsCard(onNavigate = onNavigate)
+        }
     }
+}
+
+/** The "More" hub: links to the other settings screens with no inline entry point. */
+@Composable
+private fun MoreSettingsCard(onNavigate: (Dest) -> Unit) {
+    GlassCard {
+        SectionHeader(title = "More")
+        Spacer(Modifier.height(8.dp))
+        ListRow(
+            title = "Appearance",
+            subtitle = "Accent color, glass, motion, and app icon",
+            leadingIcon = Icons.Outlined.Palette,
+            onClick = { onNavigate(Dest.Appearance) },
+            role = Role.Button,
+            onClickLabel = "Open appearance settings",
+            trailing = { NavChevron() }
+        )
+        ListRow(
+            title = "Privacy & lock",
+            subtitle = "App lock, retention, and clearing the vault",
+            leadingIcon = Icons.Outlined.Lock,
+            onClick = { onNavigate(Dest.PrivacyLock) },
+            role = Role.Button,
+            onClickLabel = "Open privacy and lock settings",
+            trailing = { NavChevron() }
+        )
+        ListRow(
+            title = "About",
+            subtitle = "Version, on-device privacy, and credits",
+            leadingIcon = Icons.Outlined.Info,
+            onClick = { onNavigate(Dest.About) },
+            role = Role.Button,
+            onClickLabel = "Open about",
+            trailing = { NavChevron() }
+        )
+    }
+}
+
+/** The end-aligned chevron shared by the hub's navigation rows. */
+@Composable
+private fun NavChevron() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+        contentDescription = null,
+        tint = TextTertiary,
+        modifier = Modifier.size(20.dp)
+    )
 }
 
 /** Daily digest toggle + delivery-hour picker. */
@@ -142,14 +207,15 @@ private fun DigestCard(
     onToggleDigest: (Boolean) -> Unit,
     onSelectHour: (Int) -> Unit
 ) {
-    SettingsGlassCard(modifier = Modifier.animateSizeChange()) {
-        SectionLabel("Daily digest")
+    GlassCard(modifier = Modifier.animateSizeChange()) {
+        SectionHeader(title = "Daily digest")
         Spacer(Modifier.height(8.dp))
-        ToggleRow(
-            icon = Icons.Filled.NotificationsActive,
+        SettingToggleRow(
+            leadingIcon = Icons.Filled.NotificationsActive,
             title = "Summarize low-priority matches",
             subtitle = "One quiet summary a day instead of many pings",
-            trailing = { GlassSwitch(checked = digestEnabled, onCheckedChange = onToggleDigest) }
+            checked = digestEnabled,
+            onCheckedChange = onToggleDigest
         )
         AnimatedVisibility(visible = digestEnabled) {
             Column {
@@ -173,8 +239,8 @@ private fun DigestCard(
 /** OTP auto-delete window picker. */
 @Composable
 private fun OtpCleanupCard(hours: Int, onSelectHours: (Int) -> Unit) {
-    SettingsGlassCard(modifier = Modifier.animateSizeChange()) {
-        SectionLabel("OTP auto-delete")
+    GlassCard(modifier = Modifier.animateSizeChange()) {
+        SectionHeader(title = "OTP auto-delete")
         Spacer(Modifier.height(4.dp))
         Text(
             text = "Captured one-time passcodes (SMS) are deleted after this window. " +
@@ -200,23 +266,12 @@ private fun PrefChipRow(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (value, label) ->
-            val isSel = value == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
-                    .background(if (isSel) Emerald400 else BgTertiary.copy(alpha = 0.6f))
-                    .clickable { onSelect(value) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isSel) OnAccent else TextSecondary,
-                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium
-                )
-            }
+            ChoiceChip(
+                label = label,
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -236,19 +291,20 @@ private fun AlertConditionCard(
     onPreview: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    SettingsGlassCard(modifier = modifier.animateSizeChange()) {
+    val accent = LocalQuietPingTheme.current.accent
+    GlassCard(modifier = modifier.animateSizeChange()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(GlassDefaults.CornerRadiusMd))
-                    .background(Emerald400.copy(alpha = 0.16f)),
+                    .background(accent.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.NotificationsActive,
                     contentDescription = null,
-                    tint = Emerald400,
+                    tint = accent,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -266,17 +322,17 @@ private fun AlertConditionCard(
                 )
             }
             if (config.isPending) {
-                StatusPill(text = "No rules yet", color = StatusAlert)
+                PillBadge(text = "No rules yet", color = StatusAlert)
             } else {
-                StatusPill(
+                PillBadge(
                     text = if (config.ruleCount == 1) "1 rule" else "${config.ruleCount} rules",
-                    color = Emerald400
+                    color = accent
                 )
             }
         }
 
         Spacer(Modifier.height(14.dp))
-        SectionLabel("Sound preset")
+        SectionHeader(title = "Sound preset")
         Spacer(Modifier.height(8.dp))
         SoundPresetGrid(
             selected = config.soundPreset,
@@ -284,8 +340,8 @@ private fun AlertConditionCard(
         )
 
         Spacer(Modifier.height(14.dp))
-        ToggleRow(
-            icon = Icons.Outlined.PlayArrow,
+        ListRow(
+            leadingIcon = Icons.Outlined.PlayArrow,
             title = "Preview tone",
             subtitle = if (config.soundPreset == SoundPreset.SILENT)
                 "Silent+ is vibrate-only" else config.soundPreset.displayName,
@@ -298,23 +354,21 @@ private fun AlertConditionCard(
         )
 
         ThinDivider()
-        ToggleRow(
-            icon = Icons.Outlined.Vibration,
+        SettingToggleRow(
+            leadingIcon = Icons.Outlined.Vibration,
             title = "Vibrate",
             subtitle = "Play the paired vibration pattern",
-            trailing = {
-                GlassSwitch(checked = config.vibrate, onCheckedChange = onToggleVibrate)
-            }
+            checked = config.vibrate,
+            onCheckedChange = onToggleVibrate
         )
 
         ThinDivider()
-        ToggleRow(
-            icon = Icons.Outlined.DoNotDisturbOn,
+        SettingToggleRow(
+            leadingIcon = Icons.Outlined.DoNotDisturbOn,
             title = "Bypass Do Not Disturb",
             subtitle = "Alert even while DND is on",
-            trailing = {
-                GlassSwitch(checked = config.dndOverride, onCheckedChange = onToggleDnd)
-            }
+            checked = config.dndOverride,
+            onCheckedChange = onToggleDnd
         )
 
         AnimatedVisibility(
@@ -347,8 +401,8 @@ private fun SoundPresetGrid(
         presets.chunked(2).forEach { rowPresets ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 rowPresets.forEach { preset ->
-                    PresetChip(
-                        preset = preset,
+                    ChoiceChip(
+                        label = preset.displayName,
                         selected = preset == selected,
                         onClick = { onSelect(preset) },
                         modifier = Modifier.weight(1f)
@@ -361,42 +415,9 @@ private fun SoundPresetGrid(
 }
 
 @Composable
-private fun PresetChip(
-    preset: SoundPreset,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg by animateColorAsState(
-        targetValue = if (selected) Emerald400 else BgTertiary.copy(alpha = 0.6f),
-        animationSpec = MotionTokens.signatureSpring(),
-        label = "presetChipBg"
-    )
-    val fg by animateColorAsState(
-        targetValue = if (selected) OnAccent else TextSecondary,
-        animationSpec = MotionTokens.signatureSpring(),
-        label = "presetChipFg"
-    )
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = preset.displayName,
-            style = MaterialTheme.typography.labelLarge,
-            color = fg,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-        )
-    }
-}
-
-@Composable
 private fun PreviewButton(enabled: Boolean, onClick: () -> Unit) {
-    val tint = if (enabled) Emerald400 else TextTertiary
+    val accent = LocalQuietPingTheme.current.accent
+    val tint = if (enabled) accent else TextTertiary
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -499,41 +520,6 @@ internal fun SettingsScreenHeader(
 }
 
 @Composable
-internal fun SettingsGlassCard(
-    modifier: Modifier = Modifier,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .glass(cornerRadius = GlassDefaults.CornerRadius)
-            .padding(16.dp),
-        content = content
-    )
-}
-
-@Composable
-internal fun SectionLabel(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = TextTertiary
-    )
-}
-
-@Composable
-internal fun StatusPill(text: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
-            .background(color.copy(alpha = 0.16f))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text = text, style = MaterialTheme.typography.labelMedium, color = color)
-    }
-}
-
-@Composable
 internal fun ThinDivider() {
     Spacer(Modifier.height(8.dp))
     Box(
@@ -543,53 +529,4 @@ internal fun ThinDivider() {
             .background(com.quietping.ui.theme.Divider)
     )
     Spacer(Modifier.height(8.dp))
-}
-
-@Composable
-internal fun ToggleRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String?,
-    trailing: @Composable () -> Unit
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = TextSecondary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        trailing()
-    }
-}
-
-@Composable
-internal fun GlassSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = OnAccent,
-            checkedTrackColor = Emerald400,
-            uncheckedThumbColor = TextSecondary,
-            uncheckedTrackColor = BgTertiary,
-            uncheckedBorderColor = Color.Transparent
-        )
-    )
 }

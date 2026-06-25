@@ -20,20 +20,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sms
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,9 +57,11 @@ import com.quietping.ui.components.LoadingShimmer
 import com.quietping.ui.components.PillBadge
 import com.quietping.ui.components.SectionHeader
 import com.quietping.ui.components.SegmentedControl
+import com.quietping.ui.components.glyph
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.Motion
 import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.StatusAlert
 import com.quietping.ui.theme.StatusWarning
@@ -161,19 +161,22 @@ private fun VaultContent(
             )
         }
 
+        val motion = LocalQuietPingTheme.current.motionEnabled
         val bodyState = when {
+            uiState.errorMessage != null -> VaultBodyState.ERROR
             uiState.isLoading -> VaultBodyState.LOADING
             uiState.isEmpty -> VaultBodyState.EMPTY
             else -> VaultBodyState.CONTENT
         }
         Crossfade(
             targetState = bodyState,
-            animationSpec = MotionTokens.signatureSpring(),
+            animationSpec = if (motion) MotionTokens.signatureSpring() else Motion.ReducedFade,
             label = "vaultBody"
         ) { state ->
             when (state) {
                 VaultBodyState.LOADING -> VaultLoading()
                 VaultBodyState.EMPTY -> VaultEmpty(uiState)
+                VaultBodyState.ERROR -> VaultError(uiState.errorMessage)
                 VaultBodyState.CONTENT -> ConversationList(
                     conversations = uiState.conversations,
                     onOpenThread = onOpenThread,
@@ -184,8 +187,8 @@ private fun VaultContent(
     }
 }
 
-/** The three mutually exclusive body states the Vault list crossfades between. */
-private enum class VaultBodyState { LOADING, EMPTY, CONTENT }
+/** The mutually exclusive body states the Vault list crossfades between. */
+private enum class VaultBodyState { LOADING, EMPTY, ERROR, CONTENT }
 
 /** A frosted-glass search input (DESIGN.md §7.5) with a leading magnifier + clear. */
 @Composable
@@ -201,7 +204,10 @@ private fun VaultSearchField(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
-            .glass(cornerRadius = GlassDefaults.CornerRadiusLg),
+            .glass(cornerRadius = GlassDefaults.CornerRadiusLg)
+            // Placeholder-only field: name it for screen readers (no visible label, to
+            // keep the frosted single-line treatment).
+            .semantics { contentDescription = "Search conversations" },
         placeholder = {
             Text(
                 text = "Search conversations",
@@ -280,8 +286,8 @@ private fun ConversationRow(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
         contentPadding = PaddingValues(14.dp),
-        glow = true,
-        sheen = true
+        role = Role.Button,
+        onClickLabel = "Open conversation with ${summary.displayName}"
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -296,7 +302,7 @@ private fun ConversationRow(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (summary.isGroup) Icons.Filled.Groups else summary.appPackage.vaultIcon(),
+                    imageVector = if (summary.isGroup) Icons.Filled.Groups else summary.appPackage.glyph(),
                     contentDescription = null,
                     tint = accent,
                     modifier = Modifier.size(22.dp)
@@ -367,9 +373,10 @@ private fun ConversationRow(
 }
 
 /**
- * Compact bell toggle for a group row. Filled bell (accent) = watched/alerting; struck
- * bell (tertiary) = muted. Sits inside the clickable card but handles its own taps, so
- * tapping the bell mutes/unmutes without opening the thread.
+ * Bell toggle for a group row. Filled bell (accent) = watched/alerting; struck bell
+ * (tertiary) = muted. Sits inside the clickable card but handles its own taps, so
+ * tapping the bell mutes/unmutes without opening the thread. Uses the [IconButton]'s
+ * default 48dp touch target so it stays an accessible, independent control.
  */
 @Composable
 private fun WatchToggle(
@@ -378,10 +385,7 @@ private fun WatchToggle(
     onToggle: () -> Unit
 ) {
     val accent = LocalQuietPingTheme.current.accent
-    IconButton(
-        onClick = onToggle,
-        modifier = Modifier.size(32.dp)
-    ) {
+    IconButton(onClick = onToggle) {
         Icon(
             imageVector = if (watched) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
             contentDescription = if (watched) {
@@ -449,16 +453,24 @@ private fun VaultEmpty(uiState: VaultUiState) {
     }
 }
 
-// --- App metadata (package-internal; shared with VaultThreadScreen) -----------
-
-/** A stroke Material icon standing in for each source app (no brand emoji, §9 / DESIGN.md). */
-internal fun AppPackage.vaultIcon(): ImageVector = when (this) {
-    AppPackage.WHATSAPP -> Icons.AutoMirrored.Filled.Chat
-    AppPackage.INSTAGRAM -> Icons.Filled.PhotoCamera
-    AppPackage.MESSENGER -> Icons.Filled.Forum
-    AppPackage.FACEBOOK -> Icons.Filled.ThumbUp
-    AppPackage.SMS -> Icons.Filled.Sms
+/**
+ * Error state when the vault store fails to load. The conversation list is driven by a
+ * `WhileSubscribed` Flow with no user-triggered re-collection hook, so this surfaces the
+ * message without a (non-functional) retry button.
+ */
+@Composable
+private fun VaultError(message: String?) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        EmptyState(
+            icon = Icons.Filled.CloudOff,
+            title = "Something went wrong",
+            message = message,
+            modifier = Modifier.padding(top = 24.dp)
+        )
+    }
 }
+
+// --- App metadata (package-internal; shared with VaultThreadScreen) -----------
 
 /** Short human label for the source app, shown as a row tag. */
 internal fun AppPackage.shortName(): String = when (this) {

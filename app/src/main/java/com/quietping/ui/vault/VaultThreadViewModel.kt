@@ -6,10 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.quietping.domain.model.Conversation
 import com.quietping.domain.model.Message
 import com.quietping.domain.repo.MessageRepository
+import com.quietping.domain.security.DecoyMode
 import com.quietping.ui.nav.Dest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -21,11 +23,13 @@ import javax.inject.Inject
  * @param messages     the ordered thread (oldest -> newest), each carrying its full
  *                     [Message.versions] history for the edited-message expander.
  * @param isLoading    true until the first thread emission arrives.
+ * @param errorMessage non-null when the thread failed to load (the screen shows an error state).
  */
 data class VaultThreadUiState(
     val conversation: Conversation? = null,
     val messages: List<Message> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null
 ) {
     /** Title for the thread app bar; falls back gracefully before the conversation resolves. */
     val title: String get() = conversation?.displayName ?: "Conversation"
@@ -66,11 +70,18 @@ class VaultThreadViewModel @Inject constructor(
             messageRepository.thread(conversationId),
             messageRepository.conversations()
         ) { messages, conversations ->
-            VaultThreadUiState(
-                conversation = conversations.firstOrNull { it.id == conversationId },
-                messages = messages,
-                isLoading = false
-            )
+            // Decoy session (unlocked with the decoy PIN): reveal a blank, empty thread.
+            if (DecoyMode.isActive) {
+                VaultThreadUiState(isLoading = false)
+            } else {
+                VaultThreadUiState(
+                    conversation = conversations.firstOrNull { it.id == conversationId },
+                    messages = messages,
+                    isLoading = false
+                )
+            }
+        }.catch {
+            emit(VaultThreadUiState(isLoading = false, errorMessage = "Couldn't load this conversation"))
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

@@ -13,6 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
@@ -44,6 +47,10 @@ import com.quietping.ui.theme.travelingGlowBorder
  * @param sheen         when true, sweeps a faint diagonal highlight across the surface
  *                      (motion-gated; no-op under reduced motion).
  * @param glowColors    accent ramp for the travelling glow lobe.
+ * @param role          accessibility role for the click action (e.g. [Role.Switch] when
+ *                      the card toggles, [Role.Button] when it navigates); null = unset.
+ * @param onClickLabel  accessibility label describing what the tap does ("Open thread").
+ * @param stateDescription announces a toggle/selection state to screen readers ("On").
  * @param content       the card body, laid out in a [Column].
  */
 @Composable
@@ -56,6 +63,9 @@ fun GlassCard(
     glow: Boolean = false,
     sheen: Boolean = false,
     glowColors: List<Color> = listOf(Emerald400, Teal400, Emerald300),
+    role: Role? = null,
+    onClickLabel: String? = null,
+    stateDescription: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -69,16 +79,22 @@ fun GlassCard(
     if (sheen) base = base.sheen()
     if (glow) base = base.travelingGlowBorder(cornerRadius = cornerRadius, colors = glowColors)
 
-    val clickable =
+    var clickable =
         if (onClick != null) {
             base.clickable(
                 interactionSource = interaction,
                 indication = ripple(),
+                onClickLabel = onClickLabel,
+                role = role,
                 onClick = onClick
             )
         } else {
             base
         }
+
+    if (stateDescription != null) {
+        clickable = clickable.semantics { this.stateDescription = stateDescription }
+    }
 
     Box(modifier = clickable) {
         Column(modifier = Modifier.padding(contentPadding), content = content)

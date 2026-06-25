@@ -17,15 +17,13 @@ import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.quietping.domain.model.AppPackage
@@ -33,7 +31,6 @@ import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.NeutralGray
-import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextTertiary
 
@@ -90,7 +87,9 @@ fun AppToggleCard(
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         onClick = { onToggle(!enabled) },
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp),
+        role = Role.Switch,
+        stateDescription = if (enabled) "On" else "Off"
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -129,18 +128,9 @@ fun AppToggleCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = OnAccent,
-                    checkedTrackColor = accent,
-                    checkedBorderColor = Color.Transparent,
-                    uncheckedThumbColor = TextTertiary,
-                    uncheckedTrackColor = NeutralGray.copy(alpha = 0.30f),
-                    uncheckedBorderColor = Color.Transparent
-                )
-            )
+            // State indicator only — the whole card is the single toggle target
+            // (GlassCard role = Switch), so the switch itself takes no click.
+            AccentSwitch(checked = enabled, onCheckedChange = null)
         }
     }
 }

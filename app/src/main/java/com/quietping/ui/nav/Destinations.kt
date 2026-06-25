@@ -91,6 +91,11 @@ sealed interface Dest {
         override val route: String = "deep_capture"
     }
 
+    /** About: version, live permission status, and the on-device privacy statement. */
+    data object About : Dest {
+        override val route: String = "about"
+    }
+
     companion object {
         /** The bottom-navigation root destinations, in display order. */
         val bottomNavRoots: List<Dest> = listOf(Home, Vault, Rules, AlertSettings)

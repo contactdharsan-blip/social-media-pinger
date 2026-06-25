@@ -40,7 +40,9 @@ val CardBg = Color(0xCC111827)      // rgba(17,24,39,0.8) opaque card fallback
 // --- Text (§2.3) ---
 val TextPrimary = Color(0xFFF8FAFC)
 val TextSecondary = Color(0xFFCBD5E1)
-val TextTertiary = Color(0xFF94A3B8)
+// Bumped from #94A3B8 (~4.3:1 on glass — failed WCAG AA for small text) to clear AA
+// while staying the muted third tier below TextPrimary/TextSecondary.
+val TextTertiary = Color(0xFFB4C0D0)
 
 // --- Semantic status (§2.5) ---
 val StatusSuccess = Color(0xFF10B981)

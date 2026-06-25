@@ -7,12 +7,18 @@ import com.quietping.domain.model.MatchLog
 import com.quietping.domain.model.Rule
 import com.quietping.domain.repo.MatchRepository
 import com.quietping.domain.repo.RuleRepository
+import com.quietping.domain.security.DecoyMode
 import com.quietping.domain.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -40,21 +46,38 @@ class HomeViewModel @Inject constructor(
         AppPackage.SMS
     )
 
+    // Bumped by retry() to re-subscribe to the dashboard streams after a load failure.
+    private val retryTrigger = MutableStateFlow(0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<HomeUiState> =
-        combine(
-            ruleRepository.rules(),
-            matchRepository.recent(RECENT_LIMIT)
-        ) { rules, matches ->
-            HomeUiState(
-                apps = buildAppStatuses(rules),
-                recentMatches = buildFeed(matches, rules),
-                isLoading = false
+        retryTrigger
+            .flatMapLatest {
+                combine(
+                    ruleRepository.rules(),
+                    matchRepository.recent(RECENT_LIMIT)
+                ) { rules, matches ->
+                    HomeUiState(
+                        apps = buildAppStatuses(rules),
+                        // Decoy session (unlocked with the decoy PIN): suppress the real
+                        // match feed so a coerced unlock reveals no sender names/snippets.
+                        recentMatches = if (DecoyMode.isActive) emptyList() else buildFeed(matches, rules),
+                        isLoading = false
+                    )
+                }.catch {
+                    emit(HomeUiState(isLoading = false, errorMessage = "Couldn't load your dashboard."))
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                initialValue = HomeUiState(isLoading = true)
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            initialValue = HomeUiState(isLoading = true)
-        )
+
+    /** Re-subscribe to the dashboard streams after a load error. */
+    fun retry() {
+        retryTrigger.update { it + 1 }
+    }
 
     // Latest rules snapshot, kept current by the collector below; used so the
     // toggle can flip concrete rules without re-collecting the Flow inline.
@@ -87,7 +110,6 @@ class HomeViewModel @Inject constructor(
             val enabledCount = appRules.count { it.enabled }
             AppStatus(
                 appPackage = app,
-                displayName = app.displayLabel(),
                 enabled = enabledCount > 0,
                 ruleCount = enabledCount
             )
@@ -114,13 +136,4 @@ class HomeViewModel @Inject constructor(
         private const val RECENT_LIMIT = 30
         private const val STOP_TIMEOUT_MS = 5_000L
     }
-}
-
-/** A human-friendly label for an [AppPackage] (Home/feed display). */
-internal fun AppPackage.displayLabel(): String = when (this) {
-    AppPackage.WHATSAPP -> "WhatsApp"
-    AppPackage.INSTAGRAM -> "Instagram"
-    AppPackage.MESSENGER -> "Messenger"
-    AppPackage.FACEBOOK -> "Facebook"
-    AppPackage.SMS -> "Messages"
 }

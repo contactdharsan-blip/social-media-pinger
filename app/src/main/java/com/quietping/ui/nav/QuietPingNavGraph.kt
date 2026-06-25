@@ -61,6 +61,7 @@ import com.quietping.ui.lock.AppLockScreen
 import com.quietping.ui.onboarding.OnboardingScreen
 import com.quietping.ui.rules.RuleEditorScreen
 import com.quietping.ui.rules.RulesScreen
+import com.quietping.ui.settings.AboutScreen
 import com.quietping.ui.settings.AlertSettingsScreen
 import com.quietping.ui.settings.AppearanceScreen
 import com.quietping.ui.settings.DeepCaptureScreen
@@ -100,7 +101,8 @@ import dev.chrisbanes.haze.hazeEffect
 @Composable
 fun QuietPingNavGraph(
     deepLinkThreadId: Long? = null,
-    onDeepLinkConsumed: () -> Unit = {}
+    onDeepLinkConsumed: () -> Unit = {},
+    startDestination: String = Dest.Onboarding.route
 ) {
     val navController = rememberNavController()
     // Shared Haze state: the NavHost content is the blur SOURCE; the glass bottom bar
@@ -125,7 +127,8 @@ fun QuietPingNavGraph(
         QuietPingNavHost(
             navController = navController,
             contentPadding = scaffoldPadding,
-            hazeState = hazeState
+            hazeState = hazeState,
+            startDestination = startDestination
         )
     }
 }
@@ -138,7 +141,8 @@ fun QuietPingNavGraph(
 private fun QuietPingNavHost(
     navController: NavHostController,
     contentPadding: PaddingValues,
-    hazeState: HazeState
+    hazeState: HazeState,
+    startDestination: String
 ) {
     // Translates a (parameter-less) Dest into a navController call. Parameterized
     // destinations are reached via the typed helpers below, not this lambda.
@@ -151,7 +155,7 @@ private fun QuietPingNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = Dest.Onboarding.route,
+        startDestination = startDestination,
         modifier = Modifier
             .fillMaxSize()
             .hazeSource(state = hazeState),
@@ -176,12 +180,22 @@ private fun QuietPingNavHost(
         }
         composable(Dest.Vault.route) {
             Box(Modifier.padding(contentPadding)) {
-                VaultScreen(onNavigate = navigate, onBack = back)
+                // C3: tapping a conversation row opens its thread (was a silent no-op).
+                VaultScreen(
+                    onNavigate = navigate,
+                    onBack = back,
+                    onOpenThread = { id -> navController.navigateToThread(id) }
+                )
             }
         }
         composable(Dest.Rules.route) {
             Box(Modifier.padding(contentPadding)) {
-                RulesScreen(onNavigate = navigate, onBack = back)
+                // H1: tapping an existing rule opens it for editing (was always NEW).
+                RulesScreen(
+                    onNavigate = navigate,
+                    onBack = back,
+                    onEditRule = { id -> navController.navigateToRuleEditor(id) }
+                )
             }
         }
         composable(Dest.AlertSettings.route) {
@@ -241,6 +255,11 @@ private fun QuietPingNavHost(
         composable(Dest.DeepCapture.route) {
             Box(Modifier.statusBarsPadding()) {
                 DeepCaptureScreen(onNavigate = navigate, onBack = back)
+            }
+        }
+        composable(Dest.About.route) {
+            Box(Modifier.statusBarsPadding()) {
+                AboutScreen(onBack = back)
             }
         }
     }

@@ -1,11 +1,14 @@
 package com.quietping.ui.onboarding
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.quietping.domain.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -69,10 +72,17 @@ data class OnboardingUiState(
  * [updateGrant]/[refreshGrants] whenever the user returns from a system screen.
  */
 @HiltViewModel
-class OnboardingViewModel @Inject constructor() : ViewModel() {
+class OnboardingViewModel @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+
+    /** Mark onboarding finished so the wizard isn't shown again on next launch. */
+    fun complete() {
+        viewModelScope.launch { settingsRepository.setOnboardingComplete(true) }
+    }
 
     /** Advance to the next step, clamped to the last step. */
     fun next() {

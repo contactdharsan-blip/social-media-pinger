@@ -9,6 +9,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
@@ -47,6 +52,8 @@ fun ShimmerBlock(
             // Reduced motion → static frost (no sweep); motion on → library shimmer.
             .then(if (motionEnabled) Modifier.shimmer() else Modifier)
             .background(base, shape)
+            // Decorative placeholder — keep it out of the accessibility tree.
+            .clearAndSetSemantics { }
     )
 }
 
@@ -61,7 +68,15 @@ fun LoadingShimmer(
     modifier: Modifier = Modifier,
     lines: Int = 3
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            // The skeleton blocks are decorative; announce one "Loading" for the group.
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Loading"
+                liveRegion = LiveRegionMode.Polite
+            }
+    ) {
         repeat(lines.coerceAtLeast(1)) { index ->
             ShimmerBlock(
                 modifier = Modifier

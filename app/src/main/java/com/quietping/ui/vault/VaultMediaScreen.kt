@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material3.Icon
@@ -44,22 +45,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.graphics.drawable.ColorDrawable
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.request.placeholder
 import com.quietping.domain.model.MediaItem
 import com.quietping.ui.components.EmptyState
+import com.quietping.ui.components.GlassButton
+import com.quietping.ui.components.GlassButtonStyle
 import com.quietping.ui.components.ShimmerBlock
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.BgPrimary
+import com.quietping.ui.theme.BgTertiary
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.Motion
 import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextSecondary
@@ -98,6 +109,7 @@ fun VaultMediaScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<MediaItem?>(null) }
+    val motion = LocalQuietPingTheme.current.motionEnabled
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -108,18 +120,23 @@ fun VaultMediaScreen(
             MediaHeader(count = uiState.items.size, onBack = onBack)
 
             val bodyState = when {
+                uiState.errorMessage != null -> MediaBodyState.ERROR
                 uiState.isLoading -> MediaBodyState.LOADING
                 uiState.isEmpty -> MediaBodyState.EMPTY
                 else -> MediaBodyState.CONTENT
             }
             Crossfade(
                 targetState = bodyState,
-                animationSpec = MotionTokens.signatureSpring(),
+                animationSpec = if (motion) MotionTokens.signatureSpring() else Motion.ReducedFade,
                 label = "mediaBody"
             ) { state ->
                 when (state) {
                     MediaBodyState.LOADING -> MediaLoadingGrid()
                     MediaBodyState.EMPTY -> MediaEmpty()
+                    MediaBodyState.ERROR -> MediaError(
+                        message = uiState.errorMessage,
+                        onRetry = viewModel::refresh
+                    )
                     MediaBodyState.CONTENT -> MediaGrid(
                         items = uiState.items,
                         onOpen = { selected = it }
@@ -143,8 +160,8 @@ fun VaultMediaScreen(
     }
 }
 
-/** The three mutually exclusive body states the gallery crossfades between. */
-private enum class MediaBodyState { LOADING, EMPTY, CONTENT }
+/** The mutually exclusive body states the gallery crossfades between. */
+private enum class MediaBodyState { LOADING, EMPTY, ERROR, CONTENT }
 
 /** Top bar: back affordance, title, and a captured-count subtitle. */
 @Composable
@@ -204,6 +221,17 @@ private fun MediaGrid(
 private fun MediaThumbnail(item: MediaItem, onClick: () -> Unit) {
     val shape = RoundedCornerShape(GlassDefaults.CornerRadiusMd)
     val interaction = remember { MutableInteractionSource() }
+    val motion = LocalQuietPingTheme.current.motionEnabled
+    val context = LocalPlatformContext.current
+    // Local File only (no network); motion-gated fade-in + a subtle surface placeholder
+    // so thumbnails reveal smoothly instead of popping in.
+    val request = remember(item.path, motion) {
+        ImageRequest.Builder(context)
+            .data(File(item.path))
+            .crossfade(motion)
+            .placeholder(ColorDrawable(BgTertiary.toArgb()))
+            .build()
+    }
     Box(
         modifier = Modifier
             .aspectRatio(1f)
@@ -217,7 +245,7 @@ private fun MediaThumbnail(item: MediaItem, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(
-            model = File(item.path),
+            model = request,
             contentDescription = item.displayName,
             modifier = Modifier
                 .fillMaxSize()
@@ -256,6 +284,29 @@ private fun MediaEmpty() {
             title = "No captured media",
             message = "Photos, videos, and voice notes QuietPing saves from your chats " +
                 "before they're deleted will appear here. Everything stays on this device.",
+            modifier = Modifier.padding(top = 24.dp)
+        )
+    }
+}
+
+/**
+ * Error state when the media scan fails. Re-scanning is a real, idempotent operation
+ * ([VaultMediaViewModel.refresh]), so this offers a working Retry.
+ */
+@Composable
+private fun MediaError(message: String?, onRetry: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        EmptyState(
+            icon = Icons.Filled.CloudOff,
+            title = "Something went wrong",
+            message = message,
+            action = {
+                GlassButton(
+                    text = "Retry",
+                    onClick = onRetry,
+                    style = GlassButtonStyle.Secondary
+                )
+            },
             modifier = Modifier.padding(top = 24.dp)
         )
     }

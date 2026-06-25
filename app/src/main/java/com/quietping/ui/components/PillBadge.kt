@@ -20,10 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
+import com.quietping.ui.theme.TabularFigures
 
 /**
  * A compact pill / chip used for statuses, tags, and counts (DESIGN.md §7.6).
@@ -39,17 +42,27 @@ import com.quietping.ui.theme.LocalQuietPingTheme
  * @param color    the semantic tint (e.g. StatusSuccess / accent / StatusAlert).
  * @param modifier external layout modifier.
  * @param icon     optional leading Material icon.
+ * @param contentDescription overrides the spoken label so a bare count ("3") can be
+ *                 announced with its meaning ("3 deleted"); null = read the visible text.
  */
 @Composable
 fun PillBadge(
     text: String,
     color: Color,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    contentDescription: String? = null
 ) {
     val motionEnabled = LocalQuietPingTheme.current.motionEnabled
+    val semantics =
+        if (contentDescription != null) {
+            Modifier.clearAndSetSemantics { this.contentDescription = contentDescription }
+        } else {
+            Modifier
+        }
     Row(
         modifier = modifier
+            .then(semantics)
             .background(
                 color = color.copy(alpha = 0.16f),
                 shape = RoundedCornerShape(GlassDefaults.CornerRadiusFull)
@@ -86,7 +99,7 @@ private fun PillLabel(text: String, color: Color) {
     Text(
         text = text,
         color = color,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = TabularFigures),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )

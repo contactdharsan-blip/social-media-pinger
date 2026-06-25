@@ -2,9 +2,10 @@ package com.quietping.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +71,8 @@ fun <T> SegmentedControl(
         val segmentWidth = maxWidth / options.size
         val indicatorOffset by animateDpAsState(
             targetValue = segmentWidth * safeIndex,
-            animationSpec = if (motionEnabled) MotionTokens.signatureSpring() else MotionTokens.gentleSpring(),
+            // Reduced motion → snap the indicator (no slide); motion on → signature spring.
+            animationSpec = if (motionEnabled) MotionTokens.signatureSpring() else snap(),
             label = "segmentIndicatorOffset"
         )
 
@@ -96,7 +99,8 @@ fun <T> SegmentedControl(
                 val interaction = remember { MutableInteractionSource() }
                 val weight by animateFloatAsState(
                     targetValue = if (active) 1f else 0.85f,
-                    animationSpec = MotionTokens.floatSpring,
+                    // Don't animate the inactive-label fade under reduced motion.
+                    animationSpec = if (motionEnabled) MotionTokens.floatSpring else snap(),
                     label = "segmentActiveFade"
                 )
                 Box(
@@ -104,10 +108,14 @@ fun <T> SegmentedControl(
                         .width(segmentWidth)
                         .fillMaxSize()
                         .clip(RoundedCornerShape(GlassDefaults.CornerRadiusMd))
-                        .clickable(
+                        // Tab semantics: announce selected state + Tab role (not a bare click).
+                        .selectable(
+                            selected = active,
                             interactionSource = interaction,
-                            indication = null
-                        ) { onSelect(index) },
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = { onSelect(index) }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

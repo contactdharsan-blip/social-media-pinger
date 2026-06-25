@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -47,7 +48,8 @@ enum class AccentPreset(val displayName: String, val hex: String) {
 data class AppearanceUiState(
     val pending: ThemeSettings = ThemeSettings(),
     val iconAliases: List<String> = emptyList(),
-    val activeIconAlias: String = "Default"
+    val activeIconAlias: String = "Default",
+    val errorMessage: String? = null
 ) {
     /** The accent preset currently selected, or null for a custom hex. */
     val selectedAccent: AccentPreset? get() = AccentPreset.fromHex(pending.accentHex)
@@ -76,6 +78,15 @@ class AppearanceViewModel @Inject constructor(
                 pending = edited ?: persisted,
                 iconAliases = iconSwitcher.available(),
                 activeIconAlias = alias
+            )
+        }.catch {
+            // Don't let a settings-read failure cancel the scope; degrade to defaults + note.
+            emit(
+                AppearanceUiState(
+                    iconAliases = iconSwitcher.available(),
+                    activeIconAlias = activeAlias.value,
+                    errorMessage = "Couldn't load appearance settings."
+                )
             )
         }.stateIn(
             scope = viewModelScope,

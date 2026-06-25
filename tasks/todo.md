@@ -1,5 +1,52 @@
 # Todo
 
+## NEW: Fresh UX/UI audit + fix pass (2026-06-25) — `/goal` autonomous
+Re-audited current source with 4 parallel agents (nav/state, a11y, visual/theming, motion/perf).
+Stale UI_AUDIT.md was WRONG about fixes — all 3 CRITICALs still open. Reports in scratchpad/audit-*.md.
+Collision rule: partition by file/package ownership, never by finding. Foundation serial (me) → screen agents parallel (1 per ui/<feature>/ pkg) → nav wiring (me) → build/test → re-audit loop.
+
+### Confirmed-against-source (not just stale-audit claims)
+- N1 decoy leak REAL: DecoyMode checked only in VaultViewModel:94; Home/VaultMedia/VaultThread VMs leak real content under decoy unlock. PRIVACY INVARIANT. (CRIT)
+- C1/C2/C3 still open (Appearance/PrivacyLock unreachable; Vault row tap no-op). H1 rule-edit broken. (CRIT/HIGH)
+- M3 zero `.catch` in any VM. N7 onboarding re-shows every launch (no completion flag). (HIGH/MED)
+- MP-06 = FALSE POSITIVE (VaultThread already statusBarsPadding @ NavGraph:212). Dropped.
+- H4 real count = 23 accent hardcodes (not 29). MP-01/02 = glow+sheen per Vault row (saveLayer/frame).
+
+### WAVE 1 — shared foundation (me, serial, compile green before agents)
+- [ ] theme/Color.kt: TextTertiary #94A3B8→#B4C0D0 (A11Y-08 contrast, app-wide)
+- [ ] theme/Type.kt: tabular-nums style for counts (T2)
+- [ ] theme/Spacing.kt NEW: spacing tokens (L6)
+- [ ] theme/GlassEffects.kt: travelingGlowBorder stroke-not-saveLayer (MP-01)
+- [ ] components: AccentSwitch NEW (M6) · ChoiceChip NEW selectable+Role.RadioButton+48dp (L4+A11Y-06) · AccentIconDisc NEW (L5) · quietPingFieldColors() (L6)
+- [ ] components/EmptyState: gate icon reveal + liveRegion Polite (MP-04, A11Y-13)
+- [ ] components/SegmentedControl: selectable Role.Tab + snap@reduced-motion + floor alpha (A11Y-10, MP-09/10)
+- [ ] components/LoadingShimmer: hideFromAccessibility + Loading region (A11Y-12)
+- [ ] components/PillBadge: tabular-nums + description param (T2, A11Y-14)
+- [ ] components/AppToggleCard: toggleable Role.Switch + onCheckedChange=null + AccentSwitch + canonical glyph() (A11Y-01, M6, H5b)
+- [ ] components/ListRow: ensure semantics (R2 adopt target)
+
+### WAVE 2 — per-package screen agents (parallel, 1 pkg each, consume Wave1, NO gradle)
+- [ ] home/ : H4(177,231) H5 dup-delete H5b-use-glyph A11Y-01 M6 M3+loading(N5) N1-decoy
+- [ ] rules/ : H4(Rules225,Editor489) H1-add-onEditRule A11Y-03(KeywordEditor 18dp)/A11Y-06/A11Y-11 ChoiceChip adopt M3+loading L6-fields
+- [ ] vault/ : C3-confirm-onOpenThread A11Y-04/05/14 N1-decoy(Media+Thread) M3 MP-02(drop row sheen) MP-14(coil placeholder)
+- [ ] settings/ : H4(many) M4-mini-lib→shared A11Y-02(ToggleRow×11)/A11Y-07 ListRow adopt(R2) ChoiceChip/AccentIconDisc M3 + hub rows→Appearance/PrivacyLock/DeepCapture/About
+- [ ] lock/ : H4(166) M5(AppLock 56dp btn→GlassButton) A11Y(error liveRegion Assertive)
+- [ ] onboarding/ : H4(225,334) M5(fork buttons→GlassButton)
+### WAVE 3 — nav wiring + new screens (me, after agents, against final signatures)
+- [ ] Destinations: Dest.About; NavGraph: C3 onOpenThread, H1 onEditRule, About route, ensure Appearance/PrivacyLock reachable from hub
+- [ ] AboutScreen NEW (version + permission status + privacy note) — hub target
+- [ ] N7: onboarding-once (DataStore flag + startDestination + MainActivity)
+### WAVE 4 — verify (me): DONE ✅ compileDebugKotlin green/warning-free; testDebugUnitTest 100 tests 0 fail; assembleDebug 42MB APK; merged manifest 0 INTERNET (src 0). No SettingsRepository fakes existed → interface widen cost 0.
+### WAVE 5 — re-audit + fix loop: DONE ✅ CONVERGED CLEAN
+  - Re-audit (4 fresh agents): motion CLEAN; found 4 must-fix the scoped pass missed:
+    (a11y) RuleCard nested switch + RuleEditor SwitchRow×3 not migrated; (M3) AlertSettings+Appearance VMs missed `.catch`; (visual H5b) RulesScreen.icon()/VaultScreen.vaultIcon() still divergent from canonical glyph().
+  - Fixed all 4 + 2 cleanups (dead `val accent` in About, dead `isFilteredEmpty`): RuleCard→role/onClickLabel+switch desc; SwitchRow→SettingToggleRow (deleted); both settings VMs +`.catch`/errorMessage + screen render; icon()/vaultIcon() deleted → canonical `glyph()` (ONE app-glyph map app-wide).
+  - Confirmation re-audit (a11y+nav+visual on 9 changed files): VERDICT clean, 0 must-fix, 0 regression.
+  - FINAL VERIFY: compileDebugKotlin green/warning-free; testDebugUnitTest 100 tests 0 fail; assembleDebug 42MB APK; merged manifest 0 INTERNET.
+  - Deferred-LOW (documented, non-blocking, audit agreed): N6 VaultThread arg String-fallback (route is typed Long, works today); L6a some literal 16.dp gutters not yet swapped to `Spacing.ScreenH` (visually consistent); Type.kt placeholder fonts (intentional); MatchLog→Vault-list (no conversationId).
+  - NOT committed (user hasn't asked). Changes in working tree. Pre-existing uncommitted PinHasher.kt left untouched (security, non-UI).
+  - REMAINING (manual, resource-gated): live emulator smoke pass (boot + install + drive Settings hub / rule edit / vault thread / decoy mode) — not run here (disk 97% full; unit+build+audit cover the static surface).
+
 ## NEW: Competitor-feature bundles (2026-06-24) — `COMPETITOR_FEATURES.md`
 Research done (4 categories). User approved ALL 4 bundles. On-device only (no INTERNET).
 DB strategy: bump AppDatabase v1→v2 + `.fallbackToDestructiveMigration()` (ephemeral capture

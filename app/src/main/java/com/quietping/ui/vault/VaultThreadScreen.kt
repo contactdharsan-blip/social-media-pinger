@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.ExpandMore
@@ -75,8 +75,6 @@ import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 import com.quietping.ui.theme.animatedItem
 import com.quietping.ui.theme.glass
-import com.quietping.ui.theme.sheen
-import com.quietping.ui.theme.travelingGlowBorder
 import java.text.DateFormat
 import java.util.Date
 
@@ -114,6 +112,7 @@ fun VaultThreadScreen(
         ThreadHeader(uiState = uiState, onBack = onBack)
 
         when {
+            uiState.errorMessage != null -> ThreadError(uiState.errorMessage)
             uiState.isLoading -> ThreadLoading()
             uiState.isEmpty -> ThreadEmpty()
             else -> ThreadList(messages = uiState.messages)
@@ -160,7 +159,8 @@ private fun ThreadHeader(uiState: VaultThreadUiState, onBack: () -> Unit) {
             PillBadge(
                 text = uiState.deletedCount.toString(),
                 color = StatusAlert,
-                icon = Icons.Filled.DeleteOutline
+                icon = Icons.Filled.DeleteOutline,
+                contentDescription = "${uiState.deletedCount} deleted"
             )
         }
         if (uiState.editedCount > 0) {
@@ -168,7 +168,8 @@ private fun ThreadHeader(uiState: VaultThreadUiState, onBack: () -> Unit) {
             PillBadge(
                 text = uiState.editedCount.toString(),
                 color = StatusWarning,
-                icon = Icons.Filled.EditNote
+                icon = Icons.Filled.EditNote,
+                contentDescription = "${uiState.editedCount} edited"
             )
         }
     }
@@ -226,9 +227,16 @@ private fun EditedMessageCard(message: Message, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         onClick = if (hasHistory) ({ expanded = !expanded }) else null,
         contentPadding = PaddingValues(14.dp),
-        glow = true,
-        sheen = true,
-        glowColors = listOf(StatusWarning)
+        onClickLabel = if (hasHistory) {
+            if (expanded) "Hide edit history" else "Show edit history"
+        } else {
+            null
+        },
+        stateDescription = if (hasHistory) {
+            if (expanded) "Expanded" else "Collapsed"
+        } else {
+            null
+        }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -255,10 +263,11 @@ private fun EditedMessageCard(message: Message, modifier: Modifier = Modifier) {
 
         if (hasHistory) {
             Spacer(Modifier.height(8.dp))
+            // Visual affordance only — the whole card owns the expand/collapse click
+            // (see GlassCard onClick + stateDescription above) so there's no nested target.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.clickable { expanded = !expanded }
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.History,
@@ -385,11 +394,6 @@ private fun DeletedMessageCard(message: Message, modifier: Modifier = Modifier) 
             .clip(RoundedCornerShape(GlassDefaults.CornerRadius))
             .glass(intensity = LocalQuietPingTheme.current.glassIntensity, cornerRadius = GlassDefaults.CornerRadius)
             .background(StatusAlert.copy(alpha = 0.06f), RoundedCornerShape(GlassDefaults.CornerRadius))
-            .sheen()
-            .travelingGlowBorder(
-                cornerRadius = GlassDefaults.CornerRadius,
-                colors = listOf(StatusAlert)
-            )
             .padding(14.dp)
     ) {
         Column {
@@ -476,6 +480,23 @@ private fun ThreadEmpty() {
             icon = Icons.Filled.Inbox,
             title = "No messages",
             message = "This conversation has no captured messages yet.",
+            modifier = Modifier.padding(top = 32.dp)
+        )
+    }
+}
+
+/**
+ * Error state when the thread fails to load. The thread is driven by a `WhileSubscribed`
+ * Flow with no user-triggered re-collection hook, so this surfaces the message without a
+ * (non-functional) retry button.
+ */
+@Composable
+private fun ThreadError(message: String?) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        EmptyState(
+            icon = Icons.Filled.CloudOff,
+            title = "Something went wrong",
+            message = message,
             modifier = Modifier.padding(top = 32.dp)
         )
     }

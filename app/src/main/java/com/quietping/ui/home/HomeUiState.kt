@@ -6,11 +6,11 @@ import com.quietping.domain.model.TriggerType
 /**
  * Per-app summary row on the Home dashboard. [enabled] reflects whether the app
  * has at least one active rule (the user's "watch this app" switch); [ruleCount]
- * is the number of enabled rules driving alerts for it.
+ * is the number of enabled rules driving alerts for it. The display name + glyph are
+ * derived from [appPackage] by the shared `AppToggleCard`.
  */
 data class AppStatus(
     val appPackage: AppPackage,
-    val displayName: String,
     val enabled: Boolean,
     val ruleCount: Int
 )
@@ -39,17 +39,19 @@ data class MatchFeedItem(
 /**
  * UI state for the Home dashboard (PRD §9.1): per-app status cards plus the live
  * match feed. Models the four async states explicitly (DESIGN.md feedback
- * contract) via [isLoading] + emptiness of [recentMatches].
+ * contract) via [isLoading] + emptiness of [recentMatches] + [errorMessage].
  *
  * @param apps          per-app toggle/summary cards in display order.
  * @param recentMatches newest-first feed of fired alerts.
  * @param isLoading     true until the first repository emission arrives.
+ * @param errorMessage  non-null when the backing Flow failed to load (DB read error).
  */
 data class HomeUiState(
     val apps: List<AppStatus> = emptyList(),
     val recentMatches: List<MatchFeedItem> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null
 ) {
-    /** True when loading has finished and there are no fired alerts yet. */
-    val isFeedEmpty: Boolean get() = !isLoading && recentMatches.isEmpty()
+    /** True when loading has finished, no error occurred, and no alerts have fired yet. */
+    val isFeedEmpty: Boolean get() = !isLoading && errorMessage == null && recentMatches.isEmpty()
 }

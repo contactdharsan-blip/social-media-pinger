@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -33,13 +34,16 @@ sealed interface PurgeResult {
 /**
  * UI state for Privacy & lock.
  *
- * @param privacy     persisted privacy settings (biometric lock, retention days).
- * @param purgeResult transient purge feedback, or null when idle.
+ * @param privacy      persisted privacy settings (biometric lock, retention days).
+ * @param purgeResult  transient purge feedback, or null when idle.
+ * @param breakIns     recent failed-unlock attempts from the encrypted break-in log.
+ * @param errorMessage set when the break-in log Flow fails to load, else null.
  */
 data class PrivacyLockUiState(
     val privacy: PrivacySettings = PrivacySettings(),
     val purgeResult: PurgeResult? = null,
-    val breakIns: List<BreakInEvent> = emptyList()
+    val breakIns: List<BreakInEvent> = emptyList(),
+    val errorMessage: String? = null
 )
 
 /**
@@ -64,6 +68,10 @@ class PrivacyLockViewModel @Inject constructor(
             breakInRepository.recent(BREAK_IN_LIMIT)
         ) { privacy, purge, breakIns ->
             PrivacyLockUiState(privacy = privacy, purgeResult = purge, breakIns = breakIns)
+        }.catch {
+            // The break-in log is an encrypted DB Flow and can fail; keep the screen
+            // usable by surfacing the message without losing settings interaction.
+            emit(PrivacyLockUiState(errorMessage = "Couldn't load the break-in log."))
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

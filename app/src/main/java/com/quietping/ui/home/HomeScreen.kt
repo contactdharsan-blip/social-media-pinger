@@ -1,6 +1,5 @@
 package com.quietping.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,50 +10,47 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.TriggerType
+import com.quietping.ui.components.AccentIconDisc
+import com.quietping.ui.components.AppToggleCard
+import com.quietping.ui.components.EmptyState
+import com.quietping.ui.components.GlassButton
+import com.quietping.ui.components.GlassButtonStyle
+import com.quietping.ui.components.GlassCard
+import com.quietping.ui.components.LoadingShimmer
+import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.displayLabel
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.Emerald400
-import com.quietping.ui.theme.GlassDefaults
-import com.quietping.ui.theme.NeutralGray
+import com.quietping.ui.theme.Spacing
+import com.quietping.ui.theme.TabularFigures
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.TextTertiary
 import com.quietping.ui.theme.cascadeItem
-import com.quietping.ui.theme.glass
-import com.quietping.ui.theme.motionEnter
-import com.quietping.ui.theme.motionExit
 import com.quietping.ui.theme.riseIn
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -83,46 +79,99 @@ fun HomeScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = Spacing.ScreenH, vertical = Spacing.ScreenV),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Item)
         ) {
             item(key = "header") { HomeHeader(modifier = Modifier.riseIn(0)) }
 
-            item(key = "apps-section") {
-                SectionLabel(text = "Watched apps", modifier = Modifier.riseIn(1))
-            }
-
-            itemsIndexed(uiState.apps, key = { _, status -> status.appPackage.name }) { index, status ->
-                AppToggleCard(
-                    status = status,
-                    onToggle = { enabled ->
-                        viewModel.setAppEnabled(status.appPackage, enabled)
-                    },
-                    modifier = cascadeItem(index)
-                )
-            }
-
-            item(key = "feed-section") {
-                Spacer(Modifier.height(8.dp))
-                SectionLabel(text = "Recent matches", modifier = Modifier.riseIn(2))
-            }
-
-            if (uiState.isFeedEmpty) {
-                item(key = "feed-empty") { FeedEmptyState() }
-            } else {
-                itemsIndexed(uiState.recentMatches, key = { _, match -> match.matchId }) { index, match ->
-                    MatchRow(
-                        item = match,
-                        // The MatchLog contract exposes a messageId but not the
-                        // owning conversationId, and the injected repositories do
-                        // not resolve one -> open the Vault conversation list.
-                        onClick = { onNavigate(Dest.Vault) },
-                        modifier = cascadeItem(index)
+            when {
+                uiState.errorMessage != null -> item(key = "error") {
+                    EmptyState(
+                        modifier = Modifier.riseIn(1),
+                        icon = Icons.Filled.CloudOff,
+                        title = "Something went wrong",
+                        message = uiState.errorMessage,
+                        action = {
+                            GlassButton(
+                                text = "Retry",
+                                onClick = viewModel::retry,
+                                style = GlassButtonStyle.Primary
+                            )
+                        }
                     )
+                }
+
+                uiState.isLoading -> {
+                    item(key = "apps-section-skeleton") {
+                        SectionHeader(title = "Watched apps", modifier = Modifier.riseIn(1))
+                    }
+                    items(4, key = { "app-skeleton-$it" }) { index ->
+                        GlassCard(modifier = cascadeItem(index).fillMaxWidth()) {
+                            LoadingShimmer(lines = 2)
+                        }
+                    }
+                    item(key = "feed-section-skeleton") {
+                        Spacer(Modifier.height(Spacing.Tight))
+                        SectionHeader(title = "Recent matches", modifier = Modifier.riseIn(2))
+                    }
+                    item(key = "feed-skeleton") {
+                        GlassCard(modifier = Modifier.fillMaxWidth()) {
+                            LoadingShimmer(lines = 2)
+                        }
+                    }
+                }
+
+                else -> {
+                    item(key = "apps-section") {
+                        SectionHeader(title = "Watched apps", modifier = Modifier.riseIn(1))
+                    }
+
+                    itemsIndexed(
+                        uiState.apps,
+                        key = { _, status -> status.appPackage.name }
+                    ) { index, status ->
+                        AppToggleCard(
+                            appPackage = status.appPackage,
+                            enabled = status.enabled,
+                            onToggle = { enabled -> viewModel.setAppEnabled(status.appPackage, enabled) },
+                            modifier = cascadeItem(index),
+                            subtitle = appSubtitle(status)
+                        )
+                    }
+
+                    item(key = "feed-section") {
+                        Spacer(Modifier.height(Spacing.Tight))
+                        SectionHeader(title = "Recent matches", modifier = Modifier.riseIn(2))
+                    }
+
+                    if (uiState.isFeedEmpty) {
+                        item(key = "feed-empty") {
+                            EmptyState(
+                                icon = Icons.Filled.NotificationsOff,
+                                title = "All quiet",
+                                message = "No alerts have fired yet. When one of your rules " +
+                                    "matches, it shows up here."
+                            )
+                        }
+                    } else {
+                        itemsIndexed(
+                            uiState.recentMatches,
+                            key = { _, match -> match.matchId }
+                        ) { index, match ->
+                            MatchRow(
+                                item = match,
+                                // The MatchLog contract exposes a messageId but not the
+                                // owning conversationId, and the injected repositories do
+                                // not resolve one -> open the Vault conversation list.
+                                onClick = { onNavigate(Dest.Vault) },
+                                modifier = cascadeItem(index)
+                            )
+                        }
+                    }
                 }
             }
 
-            item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+            item(key = "bottom-spacer") { Spacer(Modifier.height(Spacing.Section)) }
         }
     }
 }
@@ -146,60 +195,6 @@ private fun HomeHeader(modifier: Modifier = Modifier) {
     }
 }
 
-/** Uppercase section divider label (DESIGN.md typo-label treatment). */
-@Composable
-private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = TextTertiary,
-        modifier = modifier.padding(vertical = 4.dp)
-    )
-}
-
-/** A per-app card with an icon badge, rule summary, and an on/off switch. */
-@Composable
-private fun AppToggleCard(
-    status: AppStatus,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(GlassDefaults.CornerRadius))
-            .glass(cornerRadius = GlassDefaults.CornerRadius)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconBadge(
-            icon = status.appPackage.icon(),
-            tint = if (status.enabled) Emerald400 else NeutralGray
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = status.displayName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = appSubtitle(status),
-                style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary
-            )
-        }
-        // Default Material3 colors already track colorScheme.primary (= the active
-        // emerald accent), so the switch matches the theme without binding to the
-        // SwitchColors factory's individual (version-sensitive) parameter names.
-        Switch(
-            checked = status.enabled,
-            onCheckedChange = onToggle
-        )
-    }
-}
-
 private fun appSubtitle(status: AppStatus): String = when {
     !status.enabled -> "Not watching"
     status.ruleCount == 1 -> "1 active rule"
@@ -213,22 +208,21 @@ private fun MatchRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    androidx.compose.material3.Surface(
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(GlassDefaults.CornerRadius),
-        color = Color.Transparent,
-        modifier = modifier.fillMaxWidth()
+        contentPadding = PaddingValues(16.dp),
+        role = Role.Button,
+        onClickLabel = "Open in Message Vault"
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .glass(cornerRadius = GlassDefaults.CornerRadius)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconBadge(
+            AccentIconDisc(
                 icon = item.trigger.icon(),
-                tint = Emerald400
+                contentDescription = null,
+                size = 44.dp
             )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -251,7 +245,9 @@ private fun MatchRow(
             Spacer(Modifier.width(10.dp))
             Text(
                 text = relativeTime(item.firedAt),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontFeatureSettings = TabularFigures
+                ),
                 color = TextTertiary
             )
         }
@@ -269,80 +265,7 @@ private fun matchSubtitle(item: MatchFeedItem): String {
     }
 }
 
-/** Empty-state card for the feed (DESIGN.md feedback contract). */
-@Composable
-private fun FeedEmptyState() {
-    AnimatedVisibility(
-        visible = true,
-        enter = motionEnter(),
-        exit = motionExit()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(GlassDefaults.CornerRadius))
-                .glass(cornerRadius = GlassDefaults.CornerRadius)
-                .padding(vertical = 36.dp, horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .glass(cornerRadius = GlassDefaults.CornerRadiusFull),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.NotificationsOff,
-                    contentDescription = null,
-                    tint = TextTertiary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "All quiet",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "No alerts have fired yet. When one of your rules matches, it shows up here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary,
-                modifier = Modifier.fillMaxWidth(0.9f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
-/** A rounded, frosted icon badge used on cards and rows. */
-@Composable
-private fun IconBadge(icon: ImageVector, tint: Color) {
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .glass(cornerRadius = GlassDefaults.CornerRadiusMd),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(22.dp)
-        )
-    }
-}
-
 // --- Icon / label mappings (Material icons only; never emoji) -----------------
-
-private fun AppPackage.icon(): ImageVector = when (this) {
-    AppPackage.WHATSAPP -> Icons.AutoMirrored.Filled.Chat
-    AppPackage.INSTAGRAM -> Icons.Filled.CameraAlt
-    AppPackage.MESSENGER -> Icons.AutoMirrored.Filled.Message
-    AppPackage.FACEBOOK -> Icons.Filled.Group
-    AppPackage.SMS -> Icons.AutoMirrored.Filled.Message
-}
 
 private fun TriggerType?.icon(): ImageVector = when (this) {
     TriggerType.NAME_MENTION -> Icons.Filled.AlternateEmail

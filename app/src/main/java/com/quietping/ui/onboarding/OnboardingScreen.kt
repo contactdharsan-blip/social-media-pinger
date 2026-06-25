@@ -50,13 +50,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.quietping.ui.components.GlassButton
+import com.quietping.ui.components.GlassButtonStyle
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusSuccess
@@ -187,10 +190,16 @@ fun OnboardingScreen(
                     }
                 },
                 onContinue = {
-                    if (uiState.isLastStep) onNavigate(Dest.Home) else viewModel.next()
+                    if (uiState.isLastStep) {
+                        viewModel.complete()
+                        onNavigate(Dest.Home)
+                    } else viewModel.next()
                 },
                 onSkip = {
-                    if (uiState.isLastStep) onNavigate(Dest.Home) else viewModel.skip()
+                    if (uiState.isLastStep) {
+                        viewModel.complete()
+                        onNavigate(Dest.Home)
+                    } else viewModel.skip()
                 }
             )
 
@@ -208,6 +217,7 @@ private fun StepBody(
     optional: Boolean,
     granted: Boolean
 ) {
+    val accent = LocalQuietPingTheme.current.accent
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,8 +231,9 @@ private fun StepBody(
         ) {
             Icon(
                 imageVector = if (granted) Icons.Filled.CheckCircle else icon,
-                contentDescription = null,
-                tint = if (granted) StatusSuccess else Emerald400,
+                // The badge icon flips to a check to convey grant state; announce it.
+                contentDescription = if (granted) "Permission granted" else null,
+                tint = if (granted) StatusSuccess else accent,
                 modifier = Modifier.size(40.dp)
             )
         }
@@ -292,37 +303,45 @@ private fun OnboardingActions(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (granted) {
-            PrimaryGlassButton(
+            GlassButton(
                 text = if (isLast) "Done" else "Continue",
                 onClick = onContinue,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                style = GlassButtonStyle.Primary
             )
         } else {
-            PrimaryGlassButton(
+            GlassButton(
                 text = grantCta(step),
                 onClick = onGrant,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                style = GlassButtonStyle.Primary
             )
             Spacer(Modifier.height(12.dp))
-            GhostGlassButton(
+            GlassButton(
                 text = if (isLast) {
                     if (step.optional) "Skip & finish" else "Finish for now"
                 } else {
                     if (step.optional) "Skip this step" else "Not now"
                 },
                 onClick = onSkip,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                style = GlassButtonStyle.Secondary
             )
         }
     }
 }
 
-/** Step progress dots: filled emerald up to [current], subtle beyond. */
+/** Step progress dots: filled with the live accent up to [current], subtle beyond. */
 @Composable
 private fun StepProgress(current: Int, total: Int) {
+    val accent = LocalQuietPingTheme.current.accent
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        // The decorative dots convey progress; announce it as a single label.
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "Step ${current + 1} of $total"
+        }
     ) {
         repeat(total) { i ->
             val active = i <= current
@@ -331,7 +350,7 @@ private fun StepProgress(current: Int, total: Int) {
                     .height(8.dp)
                     .width(if (i == current) 24.dp else 8.dp)
                     .clip(RoundedCornerShape(GlassDefaults.CornerRadiusFull))
-                    .background(if (active) Emerald400 else MaterialTheme.colorScheme.outline)
+                    .background(if (active) accent else MaterialTheme.colorScheme.outline)
             )
         }
     }
@@ -494,69 +513,3 @@ private fun Context.checkSelfPermissionCompat(permission: String): Boolean =
     } else {
         true
     }
-
-// --- Self-contained glass buttons -------------------------------------------
-// Defined locally (not bound to the parallel-authored ui.components package) so
-// these screens compile independently. They follow the DESIGN.md button recipes:
-// primary = gradient accent fill + spring press; ghost = frosted glass + spring.
-
-@Composable
-private fun PrimaryGlassButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val accent = LocalQuietPingTheme.current.accent
-    val secondary = LocalQuietPingTheme.current.secondary
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg),
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        modifier = modifier.height(56.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
-                .background(
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(accent, secondary)
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-        }
-    }
-}
-
-@Composable
-private fun GhostGlassButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg),
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        modifier = modifier.height(56.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .glass(cornerRadius = GlassDefaults.CornerRadiusLg),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-    }
-}

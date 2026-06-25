@@ -1,5 +1,42 @@
 # QuietPing — UI/UX Audit
 
+> ## 2026-06-25 — Comprehensive re-audit + fix pass (CONVERGED CLEAN)
+>
+> The 2026-06-24 audit below (64/100) was re-run from scratch against current source with 4
+> parallel auditors (navigation/state, accessibility, visual/theming, motion/perf), every finding
+> implemented, then **re-audited twice until clean**. Net result: all CRITICAL/HIGH/MEDIUM findings
+> closed; the app is navigable end-to-end, accessible, accent-faithful, and state-complete.
+>
+> **What changed (high level):**
+> - **Navigation (was the gating problem):** Settings is now a real hub → Appearance / Privacy & lock /
+>   **new About** screen reachable; Vault row→thread tap works (C3); existing rules are editable (H1);
+>   onboarding shows **once** then persists (DataStore flag → conditional start destination).
+> - **Privacy invariant:** the decoy-PIN session now hides real content on the **Home feed, media
+>   gallery, and threads** too (previously only the Vault list honored `DecoyMode`).
+> - **Accessibility (was 0 semantic annotations):** toggle cards/rows are single `Role.Switch` targets
+>   with state announced; option chips are `Role.RadioButton`; segmented tabs `Role.Tab`; sub-48dp
+>   targets floored; shimmer hidden + "Loading" announced; empty/error live-regions; break-in announced
+>   assertively; `TextTertiary` bumped to clear WCAG AA on glass.
+> - **Theming/consistency:** every hardcoded `Emerald400` chrome site → live `LocalQuietPingTheme.accent`
+>   (custom accent now applies app-wide); one canonical app glyph map; new shared `AccentSwitch`,
+>   `SettingToggleRow`, `ChoiceChip`, `AccentIconDisc`, `quietPingFieldColors`, `Spacing`/`TabularFigures`
+>   tokens; HomeScreen/Onboarding/AppLock/Settings de-duplicated onto the shared library.
+> - **State contract:** every data-Flow ViewModel has `.catch` + an `errorMessage` + a rendered error
+>   branch; Home/Rules render loading skeletons.
+> - **Motion/perf:** per-row infinite `travelingGlowBorder`/`sheen` removed from scrolling Vault rows
+>   (kept as primitives for hero use); reduced-motion gates completed.
+>
+> **Verified:** `compileDebugKotlin` green/warning-free · `testDebugUnitTest` 100 tests, 0 fail ·
+> `assembleDebug` 42MB APK · merged manifest 0 `INTERNET` (no-exfiltration invariant intact).
+>
+> **Deferred (LOW, documented, non-blocking):** VaultThread arg String-fallback (route is typed Long);
+> a few literal `16.dp` gutters not yet swapped to the `Spacing` token; placeholder fonts (intentional);
+> match-row → Vault list (MatchLog carries no `conversationId`). Remaining: a live-device smoke pass.
+>
+> The original 2026-06-24 audit is preserved below as the historical baseline.
+>
+> ---
+
 **Scope:** Compose UI under `app/src/main/java/com/quietping/ui/` audited against PRD §6/§8/§9 and the documented DESIGN.md "Dark Liquid-Glass" system.
 **Date:** 2026-06-24
 **Overall UX score: 64 / 100** — Strong design-system foundations and high-quality individual screens, undercut by broken navigation wiring (two whole feature areas unreachable) and an incomplete loading/error contract.

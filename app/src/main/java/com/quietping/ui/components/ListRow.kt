@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.quietping.ui.theme.GlassDefaults
@@ -43,6 +44,8 @@ import com.quietping.ui.theme.pressElevation
  * @param leadingIcon optional Material icon shown in a tinted disc.
  * @param onClick     optional row click handler.
  * @param trailing    optional end-aligned content.
+ * @param role        accessibility role for the click (e.g. [Role.Button] for nav rows).
+ * @param onClickLabel accessibility label for the tap action ("Open privacy settings").
  */
 @Composable
 fun ListRow(
@@ -51,7 +54,9 @@ fun ListRow(
     subtitle: String? = null,
     leadingIcon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    role: Role? = null,
+    onClickLabel: String? = null
 ) {
     val accent = LocalQuietPingTheme.current.accent
     val interaction = remember { MutableInteractionSource() }
@@ -66,6 +71,8 @@ fun ListRow(
                 Modifier.clickable(
                     interactionSource = interaction,
                     indication = ripple(),
+                    onClickLabel = onClickLabel,
+                    role = role,
                     onClick = onClick
                 )
             } else {

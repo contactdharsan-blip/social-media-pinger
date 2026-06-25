@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
@@ -23,8 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.quietping.ui.components.GlassCard
+import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.SettingToggleRow
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.StatusAlert
+import com.quietping.ui.theme.StatusError
 import com.quietping.ui.theme.TextTertiary
 
 /**
@@ -58,30 +63,57 @@ fun DeepCaptureScreen(
             )
         }
 
-        if (!state.available && !state.loading) {
+        if (state.errorMessage != null) {
+            item { DeepCaptureErrorCard(message = state.errorMessage!!) }
+        } else if (!state.available && !state.loading) {
             item { DeepCaptureUnavailableCard(reason = state.reason) }
         } else if (state.available) {
             item {
-                SettingsGlassCard {
-                    SectionLabel("Hooked apps")
+                GlassCard {
+                    SectionHeader(title = "Hooked apps")
                     Spacer(Modifier.height(8.dp))
                     state.targets.forEachIndexed { index, target ->
                         if (index > 0) ThinDivider()
-                        ToggleRow(
-                            icon = Icons.Outlined.Visibility,
+                        SettingToggleRow(
+                            leadingIcon = Icons.Outlined.Visibility,
                             title = target.label,
                             subtitle = target.packageName,
-                            trailing = {
-                                GlassSwitch(
-                                    checked = state.enabled[target.packageName] == true,
-                                    onCheckedChange = { enabled ->
-                                        viewModel.setEnabled(target.packageName, enabled)
-                                    }
-                                )
+                            checked = state.enabled[target.packageName] == true,
+                            onCheckedChange = { enabled ->
+                                viewModel.setEnabled(target.packageName, enabled)
                             }
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Surfaces a failure to probe root/LSPosed availability, with a retry. */
+@Composable
+private fun DeepCaptureErrorCard(message: String) {
+    GlassCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                tint = StatusError,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Something went wrong",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextTertiary
+                )
             }
         }
     }
@@ -100,7 +132,7 @@ private fun DeepCaptureUnavailableCard(reason: DeepCaptureUnavailableReason?) {
                 "capture — which still works for everything except deleted-before-read " +
                 "messages."
     }
-    SettingsGlassCard {
+    GlassCard {
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = Icons.Outlined.Lock,

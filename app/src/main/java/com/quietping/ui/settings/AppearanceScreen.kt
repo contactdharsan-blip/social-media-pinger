@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +12,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,16 +41,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.quietping.R
 import com.quietping.domain.settings.ThemeSettings
 import com.quietping.icon.IconSwitcherImpl
+import com.quietping.ui.components.GlassCard
+import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.SettingToggleRow
 import com.quietping.ui.nav.Dest
 import com.quietping.ui.theme.BgTertiary
 import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
+import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.MotionTokens
 import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.QuietPingTheme
@@ -88,11 +96,22 @@ fun AppearanceScreen(
             )
         }
 
+        state.errorMessage?.let { msg ->
+            item(key = "error") {
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
         item { ThemePreviewCard(pending = state.pending) }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Accent color")
+            GlassCard {
+                SectionHeader(title = "Accent color")
                 Spacer(Modifier.height(12.dp))
                 AccentGrid(
                     selected = state.selectedAccent,
@@ -102,43 +121,35 @@ fun AppearanceScreen(
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("Surface & motion")
+            GlassCard {
+                SectionHeader(title = "Surface & motion")
                 Spacer(Modifier.height(8.dp))
                 GlassIntensityControl(
                     value = state.pending.glassIntensity,
                     onChange = viewModel::setGlassIntensity
                 )
                 ThinDivider()
-                ToggleRow(
-                    icon = Icons.Outlined.Bolt,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.Bolt,
                     title = "Motion",
                     subtitle = "Spring animations (honors system reduce-motion)",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.pending.motionEnabled,
-                            onCheckedChange = viewModel::setMotionEnabled
-                        )
-                    }
+                    checked = state.pending.motionEnabled,
+                    onCheckedChange = viewModel::setMotionEnabled
                 )
                 ThinDivider()
-                ToggleRow(
-                    icon = Icons.Outlined.DarkMode,
+                SettingToggleRow(
+                    leadingIcon = Icons.Outlined.DarkMode,
                     title = "Dark canvas",
                     subtitle = "Near-black background (recommended)",
-                    trailing = {
-                        GlassSwitch(
-                            checked = state.pending.darkMode,
-                            onCheckedChange = viewModel::setDarkMode
-                        )
-                    }
+                    checked = state.pending.darkMode,
+                    onCheckedChange = viewModel::setDarkMode
                 )
             }
         }
 
         item {
-            SettingsGlassCard {
-                SectionLabel("App icon")
+            GlassCard {
+                SectionHeader(title = "App icon")
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Switching the icon briefly refreshes your launcher. " +
@@ -164,8 +175,8 @@ fun AppearanceScreen(
  */
 @Composable
 private fun ThemePreviewCard(pending: ThemeSettings) {
-    SettingsGlassCard {
-        SectionLabel("Live preview")
+    GlassCard {
+        SectionHeader(title = "Live preview")
         Spacer(Modifier.height(12.dp))
         QuietPingTheme(themeSettings = pending) {
             Column(
@@ -267,6 +278,7 @@ private fun AccentSwatch(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Parse fallback stays Emerald400 — this is the literal default for a bad hex.
     val color = parseHexColor(preset.hex, fallback = Emerald400)
     val borderWidth by animateDpAsState(
         targetValue = if (selected) 2.dp else 0.dp,
@@ -279,7 +291,14 @@ private fun AccentSwatch(
         label = "accentBorderColor"
     )
     Column(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            // Announce selection state (not by color alone) and keep a ≥48dp target.
+            .defaultMinSize(minHeight = 48.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -303,7 +322,7 @@ private fun AccentSwatch(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Check,
-                    contentDescription = "Selected",
+                    contentDescription = null,
                     tint = OnAccent,
                     modifier = Modifier.size(20.dp)
                 )
@@ -320,6 +339,7 @@ private fun AccentSwatch(
 /** The glass-intensity slider with a leading blur icon and a live percentage. */
 @Composable
 private fun GlassIntensityControl(value: Float, onChange: (Float) -> Unit) {
+    val accent = LocalQuietPingTheme.current.accent
     val animated by animateFloatAsState(targetValue = value, label = "glassIntensity")
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,16 +359,18 @@ private fun GlassIntensityControl(value: Float, onChange: (Float) -> Unit) {
             Text(
                 text = "${(animated * 100).toInt()}%",
                 style = MaterialTheme.typography.labelLarge,
-                color = Emerald400
+                color = accent
             )
         }
         Slider(
             value = value,
             onValueChange = onChange,
             valueRange = 0f..1f,
+            // The visible label above the slider isn't associated with it for a11y.
+            modifier = Modifier.semantics { contentDescription = "Glass intensity" },
             colors = SliderDefaults.colors(
-                thumbColor = Emerald400,
-                activeTrackColor = Emerald400,
+                thumbColor = accent,
+                activeTrackColor = accent,
                 inactiveTrackColor = BgTertiary
             )
         )
@@ -384,8 +406,9 @@ private fun IconChoice(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accent = LocalQuietPingTheme.current.accent
     val borderColor by animateColorAsState(
-        targetValue = if (selected) Emerald400 else com.quietping.ui.theme.CardBorder,
+        targetValue = if (selected) accent else com.quietping.ui.theme.CardBorder,
         animationSpec = MotionTokens.signatureSpring(),
         label = "iconBorderColor"
     )
@@ -397,7 +420,13 @@ private fun IconChoice(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
-            .clickable(onClick = onClick)
+            // Announce selection state (not by color alone) and keep a ≥48dp target.
+            .defaultMinSize(minHeight = 48.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick
+            )
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -432,7 +461,7 @@ private fun IconChoice(
                         .padding(6.dp)
                         .size(20.dp)
                         .clip(CircleShape)
-                        .background(Emerald400),
+                        .background(accent),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

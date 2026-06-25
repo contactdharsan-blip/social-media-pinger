@@ -21,13 +21,15 @@ data class RuleGroup(
  * @param isLoading    true until the first emission from the repository arrives.
  * @param enabledCount number of currently-enabled rules across all apps.
  * @param totalCount   total number of rules across all apps.
+ * @param errorMessage non-null when the rule stream failed to load.
  */
 data class RulesUiState(
     val groups: List<RuleGroup> = emptyList(),
     val isLoading: Boolean = true,
     val enabledCount: Int = 0,
-    val totalCount: Int = 0
+    val totalCount: Int = 0,
+    val errorMessage: String? = null
 ) {
     /** True when there are no rules at all (drives the empty state). */
-    val isEmpty: Boolean get() = !isLoading && groups.isEmpty()
+    val isEmpty: Boolean get() = !isLoading && errorMessage == null && groups.isEmpty()
 }

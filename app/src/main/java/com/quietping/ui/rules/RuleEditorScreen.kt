@@ -1,8 +1,5 @@
 package com.quietping.ui.rules
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,18 +21,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,15 +40,16 @@ import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.RuleAction
 import com.quietping.domain.model.SoundPreset
 import com.quietping.domain.model.TriggerType
+import com.quietping.ui.components.ChoiceChip
 import com.quietping.ui.components.GlassButton
 import com.quietping.ui.components.GlassButtonStyle
 import com.quietping.ui.components.GlassCard
 import com.quietping.ui.components.SectionHeader
+import com.quietping.ui.components.SettingToggleRow
+import com.quietping.ui.components.quietPingFieldColors
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
-import com.quietping.ui.theme.OnAccent
 import com.quietping.ui.theme.TextPrimary
 import com.quietping.ui.theme.TextSecondary
 import com.quietping.ui.theme.animateSizeChange
@@ -102,7 +98,11 @@ fun RuleEditorScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 48.dp),
+                        .padding(top = 48.dp)
+                        .semantics {
+                            contentDescription = "Loading rule"
+                            liveRegion = LiveRegionMode.Polite
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = LocalQuietPingTheme.current.accent)
@@ -120,8 +120,8 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AppPackage.entries.forEach { app ->
-                        SelectChip(
-                            text = app.label(),
+                        ChoiceChip(
+                            label = app.label(),
                             selected = draft.appPackage == app,
                             onClick = { viewModel.setApp(app) }
                         )
@@ -142,8 +142,8 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TriggerType.entries.forEach { type ->
-                        SelectChip(
-                            text = type.label(),
+                        ChoiceChip(
+                            label = type.label(),
                             selected = draft.type == type,
                             onClick = { viewModel.setType(type) }
                         )
@@ -185,11 +185,12 @@ fun RuleEditorScreen(
                         value = draft.pattern,
                         onValueChange = viewModel::setPattern,
                         modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Your name") },
                         placeholder = { Text("e.g. Alex or @alex") },
                         singleLine = true,
                         shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        colors = editorFieldColors()
+                        colors = quietPingFieldColors()
                     )
                 }
 
@@ -235,8 +236,8 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SoundPreset.entries.forEach { preset ->
-                        SelectChip(
-                            text = preset.displayName,
+                        ChoiceChip(
+                            label = preset.displayName,
                             selected = draft.soundPreset == preset,
                             onClick = { viewModel.setSoundPreset(preset) }
                         )
@@ -257,8 +258,8 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AlertStyle.entries.forEach { style ->
-                        SelectChip(
-                            text = style.label(),
+                        ChoiceChip(
+                            label = style.label(),
                             selected = draft.alertStyle == style,
                             onClick = { viewModel.setAlertStyle(style) }
                         )
@@ -279,8 +280,8 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     RuleAction.entries.forEach { action ->
-                        SelectChip(
-                            text = action.label(),
+                        ChoiceChip(
+                            label = action.label(),
                             selected = draft.action == action,
                             onClick = { viewModel.setAction(action) }
                         )
@@ -297,7 +298,7 @@ fun RuleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        SwitchRow(
+                        SettingToggleRow(
                             title = "Limit to a time window",
                             subtitle = "Outside these hours the rule stays silent",
                             checked = draft.windowEnabled,
@@ -332,13 +333,13 @@ fun RuleEditorScreen(
         item(key = "switches") {
             EditorSection(title = "Behavior", subtitle = null) {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    SwitchRow(
+                    SettingToggleRow(
                         title = "Bypass Do Not Disturb",
                         subtitle = "Let this rule ping even when DND is on",
                         checked = draft.dndOverride,
                         onCheckedChange = viewModel::setDndOverride
                     )
-                    SwitchRow(
+                    SettingToggleRow(
                         title = "Enabled",
                         subtitle = "Turn the rule on or off without deleting it",
                         checked = draft.enabled,
@@ -406,93 +407,6 @@ private fun EditorSection(
     }
 }
 
-/** A selectable glass chip used for app / trigger / sound choices. */
-@Composable
-private fun SelectChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val accent = LocalQuietPingTheme.current.accent
-    val shape = RoundedCornerShape(GlassDefaults.CornerRadiusFull)
-    val bg = if (selected) accent.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    val border = if (selected) accent else MaterialTheme.colorScheme.outline
-    val textColor = if (selected) TextPrimary else TextSecondary
-
-    Row(
-        modifier = modifier
-            .clip(shape)
-            .background(bg, shape)
-            .border(width = 1.dp, color = border, shape = shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = textColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** A label/subtitle row with a trailing [Switch], used inside a card. */
-@Composable
-private fun SwitchRow(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
-            )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
-                )
-            }
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = OnAccent,
-                checkedTrackColor = Emerald400,
-                uncheckedThumbColor = TextTertiary,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        )
-    }
-}
 
 /** A curated set of hour chips for picking a window bound (minute-of-day). */
 @OptIn(ExperimentalLayoutApi::class)
@@ -509,8 +423,8 @@ private fun HourChips(
     ) {
         WINDOW_HOUR_OPTIONS.forEach { hour ->
             val min = hour * 60
-            SelectChip(
-                text = "%02d:00".format(hour),
+            ChoiceChip(
+                label = "%02d:00".format(hour),
                 selected = selectedMin == min,
                 onClick = { onSelect(min) }
             )
@@ -542,13 +456,3 @@ private fun RuleAction.description(): String = when (this) {
     RuleAction.ALERT -> "Fire an alert when this rule matches."
     RuleAction.SUPPRESS -> "Silently archive matches — never alert (keyword block)."
 }
-
-/** Shared field colors for the editor's text inputs. */
-@Composable
-private fun editorFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = LocalQuietPingTheme.current.accent,
-    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-    cursorColor = LocalQuietPingTheme.current.accent,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary
-)

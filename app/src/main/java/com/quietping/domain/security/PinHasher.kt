@@ -1,17 +1,18 @@
 package com.quietping.domain.security
 
-import java.security.MessageDigest
 import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 /**
- * Salted SHA-256 hashing for the decoy PIN. We never persist the raw PIN — only a
- * `salt:hash` hex string — so a vault dump can't reveal it.
+ * Salted PBKDF2 (HMAC-SHA256) hashing for the decoy PIN. We never persist the raw
+ * PIN — only a `salt:hash` hex string — so a vault dump can't reveal it.
  *
  * Pure and dependency-free (so it is unit-testable). The salt makes two identical
- * PINs hash differently and defeats precomputed-table lookups; iteration count is
- * modest by design — a 4–8 digit PIN has tiny entropy, so this is obfuscation of an
- * at-rest value, not a defense against an offline brute force (the real lock is
- * biometric; the decoy PIN is a coercion escape hatch, not the primary secret).
+ * PINs hash differently and defeats precomputed-table lookups; the high iteration
+ * count makes an offline brute force of the low-entropy PIN deliberately slow
+ * (OWASP 2023). The real lock is biometric; the decoy PIN is a coercion escape
+ * hatch, not the primary secret.
  */
 object PinHasher {
 
@@ -35,15 +36,12 @@ object PinHasher {
     }
 
     private fun digest(pin: String, salt: ByteArray): ByteArray {
-        val md = MessageDigest.getInstance("SHA-256")
-        md.update(salt)
-        md.update(pin.toByteArray(Charsets.UTF_8))
-        var out = md.digest()
-        repeat(ITERATIONS - 1) {
-            md.reset()
-            out = md.digest(out)
+        val spec = PBEKeySpec(pin.toCharArray(), salt, ITERATIONS, KEY_BITS)
+        return try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
         }
-        return out
     }
 
     /** Length-stable comparison so verification time doesn't leak match position. */
@@ -64,5 +62,6 @@ object PinHasher {
     }
 
     private const val SALT_BYTES = 16
-    private const val ITERATIONS = 1000
+    private const val ITERATIONS = 310_000 // OWASP 2023 PBKDF2-HMAC-SHA256 floor
+    private const val KEY_BITS = 256
 }

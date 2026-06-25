@@ -2,7 +2,6 @@ package com.quietping.ui.rules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,9 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.quietping.ui.components.quietPingFieldColors
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.TextPrimary
@@ -92,7 +93,9 @@ fun KeywordEditor(
         OutlinedTextField(
             value = field,
             onValueChange = { field = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = label },
             placeholder = { Text(label) },
             singleLine = true,
             shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg),
@@ -107,13 +110,7 @@ fun KeywordEditor(
                     )
                 }
             },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = accent,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                cursorColor = accent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            )
+            colors = quietPingFieldColors()
         )
     }
 }
@@ -143,21 +140,13 @@ private fun KeywordChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Box(
-            modifier = Modifier.size(18.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(18.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Remove $text",
-                    tint = TextTertiary,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "Remove $text",
+                tint = TextTertiary,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }

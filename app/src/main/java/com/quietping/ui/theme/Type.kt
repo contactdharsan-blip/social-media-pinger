@@ -18,6 +18,14 @@ import androidx.compose.ui.unit.sp
 val DisplayFontFamily: FontFamily = FontFamily.Default
 val BodyFontFamily: FontFamily = FontFamily.Default
 
+/**
+ * OpenType feature string for tabular (monospaced) figures. Apply via
+ * `TextStyle(fontFeatureSettings = TabularFigures)` to count/metric labels so a
+ * changing number ("3" → "12") keeps a fixed advance width and doesn't jitter the
+ * surrounding layout (e.g. rolling badge counts).
+ */
+const val TabularFigures: String = "tnum"
+
 /** Relaxed line-height treatment used for body copy (DESIGN.md: ~1.6). */
 private val Relaxed = LineHeightStyle(
     alignment = LineHeightStyle.Alignment.Center,

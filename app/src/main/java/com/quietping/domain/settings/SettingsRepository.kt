@@ -70,6 +70,9 @@ interface SettingsRepository {
     /** The currently active app-icon alias (see [com.quietping.domain.icon.IconSwitcher]). */
     val activeIconAlias: Flow<String>
 
+    /** Whether the permission-onboarding wizard has been completed (false on first launch). */
+    val onboardingComplete: Flow<Boolean>
+
     /** Persist new theme settings. */
     suspend fun setTheme(t: ThemeSettings)
 
@@ -81,4 +84,7 @@ interface SettingsRepository {
 
     /** Persist the active icon alias. */
     suspend fun setActiveIconAlias(alias: String)
+
+    /** Record that onboarding has been completed (so it isn't shown again on relaunch). */
+    suspend fun setOnboardingComplete(done: Boolean)
 }

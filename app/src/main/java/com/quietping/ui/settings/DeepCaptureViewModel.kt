@@ -32,13 +32,15 @@ enum class DeepCaptureUnavailableReason {
  * @param reason     populated when [available] is false, to explain why.
  * @param targets    the deep-capture target apps (package + label).
  * @param enabled    per-package enabled flags, keyed by package name.
+ * @param errorMessage set when probing root/LSPosed or reading the gate fails.
  */
 data class DeepCaptureUiState(
     val loading: Boolean = true,
     val available: Boolean = false,
     val reason: DeepCaptureUnavailableReason? = null,
     val targets: List<DeepCaptureTarget> = emptyList(),
-    val enabled: Map<String, Boolean> = emptyMap()
+    val enabled: Map<String, Boolean> = emptyMap(),
+    val errorMessage: String? = null
 )
 
 /**
@@ -65,22 +67,34 @@ class DeepCaptureViewModel @Inject constructor(
 
     /** Re-probe root/LSPosed status and reload the gate flags. */
     fun refresh() {
-        _uiState.update { it.copy(loading = true) }
+        _uiState.update { it.copy(loading = true, errorMessage = null) }
         viewModelScope.launch {
-            val status = rootManager.status()
-            val flags = withContext(Dispatchers.IO) { gateRepository.enabledFlags() }
-            val reason = when {
-                !status.rooted -> DeepCaptureUnavailableReason.NOT_ROOTED
-                !status.lsposedActive -> DeepCaptureUnavailableReason.LSPOSED_INACTIVE
-                else -> null
-            }
-            _uiState.update {
-                it.copy(
-                    loading = false,
-                    available = reason == null,
-                    reason = reason,
-                    enabled = flags
-                )
+            runCatching {
+                val status = rootManager.status()
+                val flags = withContext(Dispatchers.IO) { gateRepository.enabledFlags() }
+                status to flags
+            }.onSuccess { (status, flags) ->
+                val reason = when {
+                    !status.rooted -> DeepCaptureUnavailableReason.NOT_ROOTED
+                    !status.lsposedActive -> DeepCaptureUnavailableReason.LSPOSED_INACTIVE
+                    else -> null
+                }
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        available = reason == null,
+                        reason = reason,
+                        enabled = flags
+                    )
+                }
+            }.onFailure {
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        available = false,
+                        errorMessage = "Couldn't check deep-capture availability."
+                    )
+                }
             }
         }
     }

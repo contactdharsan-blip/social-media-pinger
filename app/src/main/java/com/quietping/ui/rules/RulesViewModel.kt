@@ -6,10 +6,15 @@ import com.quietping.domain.model.AppPackage
 import com.quietping.domain.model.Rule
 import com.quietping.domain.repo.RuleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,14 +28,29 @@ class RulesViewModel @Inject constructor(
     private val ruleRepository: RuleRepository
 ) : ViewModel() {
 
+    // Bumped by retry() to re-subscribe to the rule stream after a load failure.
+    private val retryTrigger = MutableStateFlow(0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RulesUiState> =
-        ruleRepository.rules()
-            .map { rules -> rules.toUiState() }
+        retryTrigger
+            .flatMapLatest {
+                ruleRepository.rules()
+                    .map { rules -> rules.toUiState() }
+                    .catch {
+                        emit(RulesUiState(isLoading = false, errorMessage = "Couldn't load your rules."))
+                    }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = RulesUiState()
             )
+
+    /** Re-subscribe to the rule stream after a load error. */
+    fun retry() {
+        retryTrigger.update { it + 1 }
+    }
 
     /** Toggle [rule]'s enabled flag and persist it. */
     fun setEnabled(rule: Rule, enabled: Boolean) {

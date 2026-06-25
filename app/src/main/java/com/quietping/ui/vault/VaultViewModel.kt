@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -50,6 +51,15 @@ class VaultViewModel @Inject constructor(
             query
         ) { conversations, deleted, edited, activeFilter, activeQuery ->
             buildState(conversations, deleted, edited, activeFilter, activeQuery)
+        }.catch {
+            emit(
+                VaultUiState(
+                    filter = filter.value,
+                    query = query.value,
+                    isLoading = false,
+                    errorMessage = "Couldn't load the vault"
+                )
+            )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

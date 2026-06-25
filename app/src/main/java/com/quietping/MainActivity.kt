@@ -77,12 +77,25 @@ class MainActivity : FragmentActivity() {
             ) {
                 settingsRepository.theme.collect { value = it }
             }
+            // Tri-state (null = still loading) so the NavHost is created with the right
+            // start destination and a returning user never flashes the onboarding wizard.
+            val onboardingDone by produceState<Boolean?>(
+                initialValue = null,
+                settingsRepository
+            ) {
+                settingsRepository.onboardingComplete.collect { value = it }
+            }
             QuietPingTheme(themeSettings = themeSettings) {
                 AppLockGate(settingsRepository) {
-                    QuietPingNavGraph(
-                        deepLinkThreadId = deepLinkThreadId,
-                        onDeepLinkConsumed = { deepLinkThreadId = null }
-                    )
+                    when (val done = onboardingDone) {
+                        null -> Box(Modifier.fillMaxSize().background(BgPrimary))
+                        else -> QuietPingNavGraph(
+                            deepLinkThreadId = deepLinkThreadId,
+                            onDeepLinkConsumed = { deepLinkThreadId = null },
+                            startDestination =
+                                if (done) Dest.Home.route else Dest.Onboarding.route
+                        )
+                    }
                 }
             }
         }

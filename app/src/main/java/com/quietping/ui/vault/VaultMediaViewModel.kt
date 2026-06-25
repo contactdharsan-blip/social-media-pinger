@@ -3,9 +3,11 @@ package com.quietping.ui.vault
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.quietping.domain.repo.MediaRepository
+import com.quietping.domain.security.DecoyMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -26,7 +28,14 @@ class VaultMediaViewModel @Inject constructor(
 
     val uiState: StateFlow<VaultMediaUiState> =
         mediaRepository.media()
-            .map { items -> VaultMediaUiState(items = items, isLoading = false) }
+            .map { items ->
+                // Decoy session (unlocked with the decoy PIN): reveal an empty gallery.
+                val visible = if (DecoyMode.isActive) emptyList() else items
+                VaultMediaUiState(items = visible, isLoading = false)
+            }
+            .catch {
+                emit(VaultMediaUiState(isLoading = false, errorMessage = "Couldn't load media"))
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

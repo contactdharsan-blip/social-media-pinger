@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,10 +37,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -52,8 +50,9 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.quietping.ui.components.GlassButton
+import com.quietping.ui.components.GlassButtonStyle
 import com.quietping.ui.nav.Dest
-import com.quietping.ui.theme.Emerald400
 import com.quietping.ui.theme.GlassDefaults
 import com.quietping.ui.theme.LocalQuietPingTheme
 import com.quietping.ui.theme.StatusError
@@ -139,6 +138,7 @@ private fun LockContent(
     onUnlock: () -> Unit,
     onSubmitPin: (String) -> Unit
 ) {
+    val accent = LocalQuietPingTheme.current.accent
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -163,7 +163,7 @@ private fun LockContent(
                     Icon(
                         imageVector = Icons.Filled.Shield,
                         contentDescription = null,
-                        tint = Emerald400,
+                        tint = accent,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -199,7 +199,13 @@ private fun LockContent(
                 enter = motionEnter(),
                 exit = motionExit()
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    // Interrupt the screen reader to report the failed unlock / break-in.
+                    modifier = Modifier.semantics(mergeDescendants = true) {
+                        liveRegion = LiveRegionMode.Assertive
+                    }
+                ) {
                     Spacer(Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -222,10 +228,13 @@ private fun LockContent(
             Spacer(Modifier.height(32.dp))
 
             if (canAuthenticate) {
-                UnlockButton(
+                GlassButton(
                     text = if (phase == AuthPhase.PROMPTING) "Waiting…" else "Unlock",
+                    onClick = onUnlock,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = GlassButtonStyle.Primary,
                     enabled = phase != AuthPhase.PROMPTING,
-                    onClick = onUnlock
+                    leadingIcon = Icons.Filled.Fingerprint
                 )
             }
 
@@ -248,49 +257,6 @@ private fun LockContent(
                     keyboardActions = KeyboardActions(onDone = {
                         if (pin.isNotEmpty()) { onSubmitPin(pin); pin = "" }
                     })
-                )
-            }
-        }
-    }
-}
-
-/** Primary gradient "Unlock" button with a fingerprint glyph. */
-@Composable
-private fun UnlockButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val accent = LocalQuietPingTheme.current.accent
-    val secondary = LocalQuietPingTheme.current.secondary
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(GlassDefaults.CornerRadiusLg),
-        color = Color.Transparent,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(GlassDefaults.CornerRadiusLg))
-                .background(Brush.linearGradient(listOf(accent, secondary))),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Fingerprint,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }

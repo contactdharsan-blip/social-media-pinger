@@ -47,6 +47,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Icon
         val ACTIVE_ICON_ALIAS = stringPreferencesKey("active_icon_alias")
+
+        // Onboarding
+        val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
     }
 
     /** Defaults sourced from the domain data classes (single source of truth). */
@@ -87,6 +90,10 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs[Keys.ACTIVE_ICON_ALIAS] ?: DEFAULT_ICON_ALIAS
     }
 
+    override val onboardingComplete: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.ONBOARDING_COMPLETE] ?: false
+    }
+
     override suspend fun setTheme(t: ThemeSettings) {
         dataStore.edit { prefs ->
             prefs[Keys.ACCENT_HEX] = t.accentHex
@@ -119,6 +126,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setActiveIconAlias(alias: String) {
         dataStore.edit { prefs ->
             prefs[Keys.ACTIVE_ICON_ALIAS] = alias
+        }
+    }
+
+    override suspend fun setOnboardingComplete(done: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.ONBOARDING_COMPLETE] = done
         }
     }
 

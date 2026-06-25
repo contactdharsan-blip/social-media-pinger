@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -79,7 +80,8 @@ data class AlertConfig(
 /** UI state: one [AlertConfig] per trigger type, plus the global alert prefs. */
 data class AlertSettingsUiState(
     val configs: List<AlertConfig> = emptyList(),
-    val alerts: AlertPrefs = AlertPrefs()
+    val alerts: AlertPrefs = AlertPrefs(),
+    val errorMessage: String? = null
 )
 
 /**
@@ -117,6 +119,15 @@ class AlertSettingsViewModel @Inject constructor(
                 edits[type]?.copy(ruleCount = baseline.ruleCount) ?: baseline
             }
             AlertSettingsUiState(configs = configs, alerts = alerts)
+        }.catch {
+            // A failed Room/DataStore read shouldn't cancel the scope or strand the UI;
+            // surface the default config plus an error note instead.
+            emit(
+                AlertSettingsUiState(
+                    configs = TriggerType.entries.map { baselineFor(it, null) },
+                    errorMessage = "Couldn't load alert settings."
+                )
+            )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

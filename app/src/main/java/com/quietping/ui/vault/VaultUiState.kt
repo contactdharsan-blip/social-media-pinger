@@ -66,18 +66,16 @@ data class ConversationSummary(
  * @param query         the active search text (matches display name + last message).
  * @param isLoading     true until the first emission arrives.
  * @param totalCount    total conversations captured (pre-filter), for empty-state copy.
+ * @param errorMessage  non-null when the vault failed to load (the list shows an error state).
  */
 data class VaultUiState(
     val conversations: List<ConversationSummary> = emptyList(),
     val filter: VaultFilter = VaultFilter.ALL,
     val query: String = "",
     val isLoading: Boolean = true,
-    val totalCount: Int = 0
+    val totalCount: Int = 0,
+    val errorMessage: String? = null
 ) {
     /** No rows to show right now (post-filter). */
     val isEmpty: Boolean get() = !isLoading && conversations.isEmpty()
-
-    /** The empty list is the result of an active filter/search, not an empty vault. */
-    val isFilteredEmpty: Boolean
-        get() = isEmpty && (totalCount > 0 || query.isNotBlank())
 }
