@@ -2,9 +2,10 @@
 
 **Smart conditional ping for Android. Silent by default; alerts only when it matters.**
 
-Fully **on-device** alert filter for WhatsApp, Instagram, Messenger, and SMS. It has **no
-`INTERNET` permission** — captured message content never leaves your phone. No servers, no
-analytics, no cloud sync.
+A **free and open source**, fully **on-device** alert filter for WhatsApp, Instagram,
+Messenger, and SMS. It has **no `INTERNET` permission** — captured message content never
+leaves your phone. No servers, no analytics, no cloud sync. Developed in the open and
+community-driven — read the source, build it yourself, and contributions are welcome.
 
 ---
 
@@ -31,7 +32,7 @@ Prefer to build from source? Full instructions are in **[INSTALL.md](INSTALL.md)
 
 ## What it does
 
-See **[PRD.md](PRD.md)** for the product spec and **[CLAUDE.md](CLAUDE.md)** for the
+See **[PRD.md](PRD.md)** for the project spec and **[CLAUDE.md](CLAUDE.md)** for the
 architecture and engineering contract.
 
 - **Event-driven capture** — notification listener / SMS observer, no polling.
@@ -52,3 +53,18 @@ architecture and engineering contract.
 > "delete-for-everyone" messages from inside the chat apps themselves. It ships **inert**
 > — it does nothing unless you are rooted with LSPosed *and* explicitly enable and scope
 > it. See [FACE2_XPOSED_RD.md](FACE2_XPOSED_RD.md).
+
+---
+
+## Open source
+
+QuietPing is developed in the open. The full source lives in this repository — nothing is
+hidden behind a proprietary blob, and the no-network privacy promise is auditable by anyone:
+clone the repo and read it.
+
+- **Build it yourself** — see **[INSTALL.md](INSTALL.md)**.
+- **Contributions welcome** — issues and pull requests are the way the project moves
+  forward; it's community-driven, not a closed product.
+- **Verify the privacy claims** — there is no `INTERNET` permission and no networking
+  dependency anywhere in the tree; grep for it and confirm.
+- **License** — released under the [MIT License](LICENSE). Use it, fork it, ship it.

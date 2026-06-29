@@ -21,6 +21,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Optional biometric app lock for the Vault (PRD §11). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Haptic feedback for the per-condition vibration preview in Alert settings (PRD §8). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Foreground service for the SMS ContentObserver / listener keep-alive. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -37,6 +39,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!--
+      READ_SMS implies telephony hardware; declare it not-required so the app stays
+      installable on tablets / ChromeOS (SMS features simply degrade). On-device only.
+    -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:name=".QuietPingApp"

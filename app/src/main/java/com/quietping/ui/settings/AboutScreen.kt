@@ -49,7 +49,7 @@ import com.quietping.ui.theme.TextTertiary
 /**
  * About screen (PRD §9.1): app version, the live status of the core notification-access
  * permission (so it can be reviewed/re-granted post-onboarding), and the on-device
- * privacy statement that is the product's defining promise. Reachable from the Settings
+ * privacy statement that is the project's defining promise. Reachable from the Settings
  * hub. Full-screen route — the NavGraph supplies the status-bar inset.
  */
 @Composable
@@ -119,7 +119,8 @@ fun AboutScreen(onBack: () -> Unit = {}) {
             Text(
                 text = "Everything stays on this device. QuietPing has no internet permission — " +
                     "no servers, no analytics, no cloud sync. Captured messages are encrypted at rest " +
-                    "and auto-purged on your retention schedule.",
+                    "and auto-purged on your retention schedule. QuietPing is free and open source, so " +
+                    "you don't have to take our word for it — the privacy promise is verifiable in the code.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )

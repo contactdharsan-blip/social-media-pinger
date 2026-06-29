@@ -8,6 +8,7 @@
 | **Platform** | Android (minSdk 26 / Android 8.0, target latest) |
 | **Apps covered** | WhatsApp, Instagram, Facebook/Messenger, Messages (SMS/MMS) |
 | **Network** | None — fully on-device (no `INTERNET` permission) |
+| **Distribution** | Free and open source — developed in the open; build from source or sideload |
 | **Design language** | Dark Liquid-Glass (see `/Users/Dharsan/Downloads/identification med/DESIGN.md`) |
 
 ---
@@ -30,6 +31,10 @@ you **customize** the app icon and UI theme.
 
 > One line: *an on-device alert filter that re-notifies you only when your
 > conditions fire, and quietly archives what others edit or delete.*
+
+QuietPing is **free and open source** and community-driven. Its privacy promise is not a
+marketing claim but an auditable property of the source: the no-network guarantee can be
+verified by anyone reading this repository.
 
 ---
 

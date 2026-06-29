@@ -74,6 +74,11 @@ fun HelpScreen(onBack: () -> Unit = {}) {
                     "edited or deleted. Everything runs on this device — there is no internet " +
                     "permission, no server, no analytics, no cloud."
             )
+            Spacer(Modifier.height(8.dp))
+            Body(
+                "QuietPing is free and open source and developed in the open, so anyone can read " +
+                    "the code and confirm these claims for themselves."
+            )
         }
 
         // The core loop.

@@ -1,13 +1,14 @@
 # Installing QuietPing
 
-QuietPing is a **fully on-device** Android app. It has **no `INTERNET` permission** — captured
-message content never leaves the phone. It is **not on the Play Store**; you build the APK from
-source and sideload it onto your device.
+QuietPing is a **free and open source**, **fully on-device** Android app. It has **no
+`INTERNET` permission** — captured message content never leaves the phone. It is **not on the
+Play Store**; you build the APK from source or grab a prebuilt one and sideload it onto your
+device. Because the project is open source, you can read every line before you trust it.
 
 - **Build host:** Windows, macOS, or Linux
 - **Target device:** Android 8.0 (API 26) or newer
-- **Audience:** most users download a prebuilt APK (Part 0); developers build from source
-  (Part 1); end users grant permissions (Part 3)
+- **Audience:** most users download a prebuilt APK (Part 0); developers and contributors build
+  from source (Part 1); users grant permissions (Part 3)
 
 ---
 

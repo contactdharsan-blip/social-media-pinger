@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!--
       Platform theme. The real UI is Compose + Material3 (com.quietping.ui.theme),
       so this XML theme only governs the window the Activity lives in: near-black
@@ -19,7 +19,7 @@
         <item name="android:statusBarColor">@color/qp_transparent</item>
         <item name="android:navigationBarColor">@color/qp_transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 </resources>
